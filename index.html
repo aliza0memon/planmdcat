@@ -1770,24 +1770,24 @@ document.getElementById(sub.id).innerHTML = buildRing(pct, sub.name, sub.color, 
     </div>`).join('');
 }
 function buildRing(pct, label, color, size=100) {
-  const s    = 100;
   const r    = 40;
   const circ = 2 * Math.PI * r;
   const off  = circ - (pct / 100) * circ;
-  return `<div class="ring-wrap" style="width:${size}px;height:${size}px;flex-direction:column;display:inline-flex;align-items:center;justify-content:center;position:relative;">
-    <svg width="${size}" height="${size}" viewBox="0 0 ${s} ${s}" xmlns="http://www.w3.org/2000/svg" style="transform:rotate(-90deg);position:absolute;top:0;left:0;">
+  return `
+  <div style="display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;">
+    <svg width="${size}" height="${size}" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style="transform:rotate(-90deg);display:block;">
       <circle cx="50" cy="50" r="${r}" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="10"/>
       <circle cx="50" cy="50" r="${r}" fill="none" stroke="${color}" stroke-width="10"
-        stroke-dasharray="${circ.toFixed(2)}" stroke-dashoffset="${off.toFixed(2)}"
+        stroke-dasharray="${circ.toFixed(2)}"
+        stroke-dashoffset="${off.toFixed(2)}"
         stroke-linecap="round"/>
     </svg>
-    <div style="position:relative;text-align:center;z-index:1;">
-      <div style="font-size:${size>90?16:13}px;font-weight:800;color:${color};line-height:1;">${pct}%</div>
-      <div style="font-size:10px;color:#7FA8C9;font-weight:600;margin-top:3px;">${label}</div>
+    <div style="text-align:center;margin-top:-${size*0.6}px;position:relative;">
+      <div style="font-size:${size>90?15:12}px;font-weight:800;color:${color};line-height:1;">${pct}%</div>
+      <div style="font-size:9px;color:#7FA8C9;font-weight:600;margin-top:2px;">${label}</div>
     </div>
   </div>`;
 }
-
 // ═══════════════════════════════════════════════════════════════
 // DAILY TRACKER
 // ═══════════════════════════════════════════════════════════════
