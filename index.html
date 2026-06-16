@@ -680,7 +680,7 @@ tbody tr:hover td { background: rgba(0,180,216,0.05); }
   .badge-name { font-size: 11px; }
 
   /* Subject rings - scrollable row */
-  #ringBio, #ringChem, #ringPhys, #ringEng, #ringLR { flex-shrink: 0; }
+ #ringBio, #ringChem, #ringPhys, #ringEng, #ringLR { flex-shrink: 0; width: 90px; height: 90px; }
 
   /* Milestone */
   .milestone-card { padding: 14px 10px; }
@@ -1749,7 +1749,8 @@ function renderDashboard() {
   subjects.forEach(sub => {
     const s   = state.subjects[sub.key] || { done:0, total:10 };
     const pct = s.total ? Math.round((s.done / s.total) * 100) : 0;
-    document.getElementById(sub.id).innerHTML = buildRing(pct, sub.name, sub.color, 100);
+    const ringSize = window.innerWidth < 768 ? 90 : 100;
+document.getElementById(sub.id).innerHTML = buildRing(pct, sub.name, sub.color, ringSize);
   });
 
   const el     = document.getElementById('recentEntries');
