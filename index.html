@@ -1769,18 +1769,22 @@ document.getElementById(sub.id).innerHTML = buildRing(pct, sub.name, sub.color, 
       ${d.notes ? `<div style="font-size:12px;color:var(--text-muted);margin-top:8px">${d.notes}</div>` : ''}
     </div>`).join('');
 }
-
 function buildRing(pct, label, color, size=100) {
-  const r    = (size/2) - 10;
+  const s    = 100;
+  const r    = 40;
   const circ = 2 * Math.PI * r;
-  const off  = circ - (pct/100) * circ;
-  return `<div class="ring-wrap" style="width:${size}px;height:${size}px;flex-direction:column">
-    <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-      <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="8"/>
-      <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="${color}" stroke-width="8"
-        stroke-dasharray="${circ}" stroke-dashoffset="${off}" stroke-linecap="round" style="transition:stroke-dashoffset 1s ease"/>
+  const off  = circ - (pct / 100) * circ;
+  return `<div class="ring-wrap" style="width:${size}px;height:${size}px;flex-direction:column;display:inline-flex;align-items:center;justify-content:center;position:relative;">
+    <svg width="${size}" height="${size}" viewBox="0 0 ${s} ${s}" xmlns="http://www.w3.org/2000/svg" style="transform:rotate(-90deg);position:absolute;top:0;left:0;">
+      <circle cx="50" cy="50" r="${r}" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="10"/>
+      <circle cx="50" cy="50" r="${r}" fill="none" stroke="${color}" stroke-width="10"
+        stroke-dasharray="${circ.toFixed(2)}" stroke-dashoffset="${off.toFixed(2)}"
+        stroke-linecap="round"/>
     </svg>
-    <div class="ring-text"><div class="ring-pct" style="color:${color};font-size:${size>90?18:14}px">${pct}%</div><div class="ring-label">${label}</div></div>
+    <div style="position:relative;text-align:center;z-index:1;">
+      <div style="font-size:${size>90?16:13}px;font-weight:800;color:${color};line-height:1;">${pct}%</div>
+      <div style="font-size:10px;color:#7FA8C9;font-weight:600;margin-top:3px;">${label}</div>
+    </div>
   </div>`;
 }
 
