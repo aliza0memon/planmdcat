@@ -1,0 +1,2259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Firebase Modular SDK -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import {
+      getAuth, signInWithPopup, GoogleAuthProvider,
+      signOut, onAuthStateChanged
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import {
+      getFirestore, doc, setDoc, getDoc, updateDoc, collection
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDunS8dd9_ZBt2I5rlMOxIpeNZQeLbvRwQ",
+      authDomain: "planmdcat.firebaseapp.com",
+      projectId: "planmdcat",
+      storageBucket: "planmdcat.firebasestorage.app",
+      messagingSenderId: "753610668562",
+      appId: "1:753610668562:web:ee3d7883b11e21f44936cb",
+      measurementId: "G-GD9KW7T1YQ"
+    };
+
+    const app  = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db   = getFirestore(app);
+
+    const ADMIN_EMAIL = "alizamemon086@gmail.com";
+
+    window._firebaseAuth = auth;
+    window._firebaseDb   = db;
+    window._firebaseDoc  = doc;
+    window._firebaseSetDoc   = setDoc;
+    window._firebaseGetDoc   = getDoc;
+    window._firebaseUpdateDoc = updateDoc;
+    window._GoogleAuthProvider = GoogleAuthProvider;
+    window._firebaseSignOut    = signOut;
+    window._onAuthStateChanged = onAuthStateChanged;
+    window._ADMIN_EMAIL        = ADMIN_EMAIL;
+
+    onAuthStateChanged(auth, async (user) => {
+  if (user) {
+
+    const userRef = doc(db, "users", user.uid);
+    const snap = await getDoc(userRef);
+
+    if (!snap.exists()) {
+      await setDoc(userRef, {
+        email: user.email,
+        paid: user.email === ADMIN_EMAIL
+      });
+    }
+
+    const updatedSnap = await getDoc(userRef);
+    const paid = updatedSnap.data().paid === true;
+
+    window._currentUser = user;
+    window._isPaid = paid;
+
+    if (typeof window._onAuthReady === "function") {
+      window._onAuthReady(user, paid);
+    }
+
+  } else {
+
+    window._currentUser = null;
+    window._isPaid = false;
+
+    if (typeof window._onAuthReady === "function") {
+      window._onAuthReady(null, false);
+    }
+  }
+});
+  </script>
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MDCAT Study Tracker</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --navy:       #0A1628;
+  --navy-mid:   #112240;
+  --navy-light: #1A3260;
+  --teal:       #00B4D8;
+  --teal-dark:  #0096C7;
+  --mint:       #90E0EF;
+  --mint-pale:  #CAF0F8;
+  --gold:       #FFB703;
+  --gold-light: #FFD60A;
+  --white:      #F0F8FF;
+  --text-main:  #E8F4FD;
+  --text-muted: #7FA8C9;
+  --glass-bg:   rgba(17,34,64,0.7);
+  --glass-border: rgba(0,180,216,0.2);
+  --success:    #06D6A0;
+  --warning:    #FFB703;
+  --danger:     #EF476F;
+  --shadow:     0 8px 32px rgba(0,0,0,0.4);
+  --radius:     16px;
+  --radius-sm:  10px;
+  --transition: 0.3s cubic-bezier(0.4,0,0.2,1);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--navy);
+  color: var(--text-main);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 20% 20%, rgba(0,180,216,0.08) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(255,183,3,0.05) 0%, transparent 50%),
+    radial-gradient(circle at 60% 30%, rgba(144,224,239,0.04) 0%, transparent 40%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* LOGIN SCREEN */
+#loginScreen {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 100vh; position: relative; z-index: 10;
+}
+.login-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(24px);
+  border: 1px solid var(--glass-border);
+  border-radius: 24px;
+  padding: 52px 44px;
+  width: 90%; max-width: 440px;
+  text-align: center;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+  animation: slideUp 0.5s ease;
+}
+.login-logo { font-size: 64px; margin-bottom: 16px; display: block; animation: heartbeat 2s ease infinite; }
+@keyframes heartbeat { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+.login-title  { font-size: 28px; font-weight: 900; color: var(--white); letter-spacing: -0.5px; margin-bottom: 6px; }
+.login-sub    { font-size: 14px; color: var(--text-muted); margin-bottom: 36px; line-height: 1.6; }
+.btn-google {
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  width: 100%; padding: 15px 24px;
+  background: #fff; color: #1f1f1f;
+  border: none; border-radius: var(--radius-sm);
+  font-family: 'Inter', sans-serif; font-size: 15px; font-weight: 700;
+  cursor: pointer; transition: all var(--transition);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+}
+.btn-google:hover { transform: translateY(-3px); box-shadow: 0 8px 28px rgba(0,0,0,0.35); }
+.google-icon { width: 22px; height: 22px; }
+.login-footer { font-size: 11px; color: var(--text-muted); margin-top: 24px; opacity: 0.7; }
+
+/* PAYMENT SCREEN */
+#paymentScreen {
+  display: none; align-items: center; justify-content: center;
+  min-height: 100vh; position: relative; z-index: 10; padding: 20px;
+}
+.payment-card {
+  background: var(--glass-bg); backdrop-filter: blur(24px);
+  border: 1px solid var(--glass-border); border-radius: 24px;
+  padding: 44px 40px; width: 90%; max-width: 520px;
+  text-align: center; box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+  animation: slideUp 0.5s ease;
+}
+.payment-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(255,183,3,0.15); border: 1px solid rgba(255,183,3,0.4);
+  border-radius: 20px; padding: 5px 14px;
+  font-size: 12px; font-weight: 700; color: var(--gold);
+  text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 18px;
+}
+.payment-title { font-size: 26px; font-weight: 900; color: var(--white); letter-spacing: -0.5px; margin-bottom: 6px; }
+.payment-sub   { font-size: 14px; color: var(--text-muted); margin-bottom: 28px; }
+.price-box {
+  background: linear-gradient(135deg, rgba(255,183,3,0.15), rgba(255,183,3,0.05));
+  border: 2px solid rgba(255,183,3,0.4); border-radius: 16px;
+  padding: 22px; margin-bottom: 24px;
+}
+.price-amount { font-size: 48px; font-weight: 900; color: var(--gold); letter-spacing: -2px; line-height: 1; }
+.price-label  { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+.payment-steps { display: flex; flex-direction: column; gap: 14px; margin-bottom: 24px; text-align: left; }
+.payment-step {
+  background: rgba(0,180,216,0.08); border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm); padding: 14px 16px;
+  display: flex; align-items: center; gap: 12px;
+}
+.step-num {
+  width: 28px; height: 28px;
+  background: linear-gradient(135deg, var(--teal), var(--teal-dark));
+  border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 800; color: #fff; flex-shrink: 0;
+}
+.step-text { font-size: 13.5px; color: var(--text-main); }
+.step-text strong { color: var(--teal); }
+.payment-contact-box {
+  background: rgba(6,214,160,0.08); border: 1px solid rgba(6,214,160,0.3);
+  border-radius: var(--radius-sm); padding: 16px 20px; margin-bottom: 20px;
+}
+.contact-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px; }
+.contact-row:last-child { margin-bottom: 0; }
+.contact-label { font-size: 12px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; }
+.contact-val   { font-size: 15px; font-weight: 800; color: var(--success); letter-spacing: 0.5px; }
+.payment-note  { font-size: 12.5px; color: var(--text-muted); line-height: 1.6; margin-bottom: 20px; }
+.payment-note strong { color: var(--gold); }
+.btn-whatsapp {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; padding: 14px 24px;
+  background: linear-gradient(135deg, #25D366, #128C7E);
+  color: #fff; border: none; border-radius: var(--radius-sm);
+  font-family: 'Inter', sans-serif; font-size: 15px; font-weight: 700;
+  cursor: pointer; transition: all var(--transition); text-decoration: none;
+  box-shadow: 0 4px 16px rgba(37,211,102,0.3); margin-bottom: 12px;
+}
+.btn-whatsapp:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(37,211,102,0.45); }
+.payment-logout {
+  font-size: 12px; color: var(--text-muted); cursor: pointer; margin-top: 8px;
+  text-decoration: underline; background: none; border: none; font-family: 'Inter', sans-serif;
+}
+.payment-logout:hover { color: var(--danger); }
+
+/* LOADING SCREEN */
+#loadingScreen {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 100vh; position: relative; z-index: 10;
+  flex-direction: column; gap: 16px;
+}
+.spinner {
+  width: 44px; height: 44px;
+  border: 4px solid rgba(0,180,216,0.2); border-top-color: var(--teal);
+  border-radius: 50%; animation: spin 0.9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { font-size: 14px; color: var(--text-muted); font-weight: 600; }
+
+/* APP WRAPPER */
+.app-wrapper { display: none; min-height: 100vh; position: relative; z-index: 1; }
+
+/* SIDEBAR */
+.sidebar {
+  width: 240px; min-height: 100vh;
+  background: var(--glass-bg); backdrop-filter: blur(20px);
+  border-right: 1px solid var(--glass-border);
+  display: flex; flex-direction: column;
+  position: fixed; left: 0; top: 0; bottom: 0;
+  z-index: 300; transition: transform var(--transition); overflow-y: auto;
+}
+.sidebar-logo { padding: 28px 20px 20px; border-bottom: 1px solid var(--glass-border); }
+.logo-icon {
+  width: 44px; height: 44px;
+  background: linear-gradient(135deg, var(--teal), var(--teal-dark));
+  border-radius: 12px; display: flex; align-items: center; justify-content: center;
+  font-size: 22px; margin-bottom: 10px; box-shadow: 0 4px 16px rgba(0,180,216,0.4);
+}
+.logo-title { font-size: 15px; font-weight: 800; color: var(--white); letter-spacing: -0.3px; }
+.logo-sub   { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+/* Sidebar User Block */
+.sidebar-user {
+  padding: 14px 16px; border-bottom: 1px solid var(--glass-border);
+  display: flex; align-items: center; gap: 10px;
+}
+.sidebar-user-avatar {
+  width: 36px; height: 36px; border-radius: 50%;
+  border: 2px solid var(--teal); object-fit: cover; flex-shrink: 0;
+}
+.sidebar-user-avatar-placeholder {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--teal), var(--teal-dark));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; font-weight: 700; color: #fff; flex-shrink: 0;
+  border: 2px solid var(--teal);
+}
+.sidebar-user-info { flex: 1; min-width: 0; }
+.sidebar-user-name  { font-size: 12.5px; font-weight: 700; color: var(--white); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sidebar-user-email { font-size: 10px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.btn-logout {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 12px; margin: 10px 12px 2px;
+  background: rgba(239,71,111,0.1); border: 1px solid rgba(239,71,111,0.3);
+  border-radius: var(--radius-sm); color: var(--danger);
+  font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 700;
+  cursor: pointer; transition: all var(--transition);
+  width: calc(100% - 24px); justify-content: center;
+}
+.btn-logout:hover { background: rgba(239,71,111,0.2); }
+
+.sidebar-nav { flex: 1; padding: 16px 12px; }
+.nav-section-label {
+  font-size: 10px; font-weight: 700; color: var(--text-muted);
+  letter-spacing: 1.2px; text-transform: uppercase; padding: 14px 8px 6px;
+}
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: var(--radius-sm); cursor: pointer;
+  transition: all var(--transition); color: var(--text-muted);
+  font-size: 13.5px; font-weight: 500; margin-bottom: 2px;
+}
+.nav-item:hover { background: rgba(0,180,216,0.1); color: var(--teal); }
+.nav-item.active { background: rgba(0,180,216,0.18); color: var(--teal); font-weight: 600; }
+.nav-item .nav-icon { font-size: 16px; width: 20px; text-align: center; }
+.sidebar-footer { padding: 16px; border-top: 1px solid var(--glass-border); font-size: 11px; color: var(--text-muted); text-align: center; }
+
+/* MAIN CONTENT */
+.main-content { flex: 1; margin-left: 240px; padding: 24px; min-height: 100vh; }
+
+/* PAGES */
+.page { display: none; animation: fadeIn 0.4s ease; }
+.page.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+@keyframes slideUp { from { transform: translateY(30px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* SAVE INDICATOR */
+#saveIndicator {
+  position: fixed; top: 16px; right: 16px;
+  background: rgba(6,214,160,0.15); border: 1px solid rgba(6,214,160,0.4);
+  border-radius: 8px; padding: 6px 14px; font-size: 12px; font-weight: 600;
+  color: var(--success); z-index: 9990; opacity: 0;
+  transition: opacity 0.4s ease; display: flex; align-items: center; gap: 6px;
+}
+#saveIndicator.show { opacity: 1; }
+
+/* COMMON COMPONENTS */
+.page-title    { font-size: 26px; font-weight: 800; color: var(--white); margin-bottom: 6px; letter-spacing: -0.5px; }
+.page-subtitle { color: var(--text-muted); font-size: 14px; margin-bottom: 28px; }
+.glass-card {
+  background: var(--glass-bg); backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border); border-radius: var(--radius);
+  padding: 24px; box-shadow: var(--shadow);
+  transition: transform var(--transition), border-color var(--transition);
+}
+.glass-card:hover { border-color: rgba(0,180,216,0.4); }
+.grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+.section-title { font-size: 17px; font-weight: 700; color: var(--white); margin-bottom: 18px; display: flex; align-items: center; gap: 8px; }
+.form-group { margin-bottom: 18px; }
+label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 7px; }
+input[type="text"], input[type="number"], input[type="date"], input[type="email"], select, textarea {
+  width: 100%; background: rgba(10,22,40,0.8); border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm); color: var(--text-main);
+  font-family: 'Inter', sans-serif; font-size: 14px; padding: 11px 14px;
+  outline: none; transition: border-color var(--transition), box-shadow var(--transition);
+}
+input:focus, select:focus, textarea:focus { border-color: var(--teal); box-shadow: 0 0 0 3px rgba(0,180,216,0.15); }
+select option { background: var(--navy-mid); }
+textarea { resize: vertical; min-height: 80px; }
+.btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 11px 22px; border-radius: var(--radius-sm); border: none;
+  cursor: pointer; font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 600;
+  transition: all var(--transition);
+}
+.btn-primary { background: linear-gradient(135deg, var(--teal), var(--teal-dark)); color: #fff; box-shadow: 0 4px 16px rgba(0,180,216,0.35); }
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,180,216,0.45); }
+.btn-gold { background: linear-gradient(135deg, var(--gold), var(--gold-light)); color: var(--navy); }
+.btn-gold:hover { transform: translateY(-2px); }
+.btn-ghost { background: rgba(0,180,216,0.1); color: var(--teal); border: 1px solid rgba(0,180,216,0.3); }
+.btn-ghost:hover { background: rgba(0,180,216,0.2); }
+.btn-danger { background: rgba(239,71,111,0.15); color: var(--danger); border: 1px solid rgba(239,71,111,0.3); }
+.btn-danger:hover { background: rgba(239,71,111,0.3); }
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+.badge-teal    { background: rgba(0,180,216,0.2); color: var(--teal); }
+.badge-gold    { background: rgba(255,183,3,0.2); color: var(--gold); }
+.badge-success { background: rgba(6,214,160,0.2); color: var(--success); }
+.badge-danger  { background: rgba(239,71,111,0.2); color: var(--danger); }
+.progress-bar-wrap { background: rgba(255,255,255,0.07); border-radius: 20px; height: 8px; overflow: hidden; }
+.progress-bar-fill { height: 100%; border-radius: 20px; background: linear-gradient(90deg, var(--teal), var(--mint)); transition: width 0.8s cubic-bezier(0.4,0,0.2,1); }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+thead th { background: rgba(0,180,216,0.12); color: var(--teal); font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.7px; padding: 11px 14px; text-align: left; border-bottom: 1px solid var(--glass-border); }
+tbody td { padding: 11px 14px; border-bottom: 1px solid rgba(255,255,255,0.04); color: var(--text-main); }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover td { background: rgba(0,180,216,0.05); }
+.ring-wrap { position: relative; display: inline-flex; align-items: center; justify-content: center; }
+.ring-wrap svg { transform: rotate(-90deg); }
+.ring-text { position: absolute; text-align: center; }
+.ring-pct   { font-size: 22px; font-weight: 800; color: var(--white); line-height: 1; }
+.ring-label { font-size: 10px; color: var(--text-muted); font-weight: 600; margin-top: 3px; }
+#toast {
+  position: fixed; bottom: 30px; right: 30px;
+  background: var(--navy-mid); border: 1px solid var(--teal);
+  border-radius: var(--radius-sm); padding: 14px 22px; color: var(--white);
+  font-size: 14px; font-weight: 500; z-index: 9999;
+  opacity: 0; transform: translateY(20px); transition: all 0.4s ease;
+  display: flex; align-items: center; gap: 8px; box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+#toast.show { opacity: 1; transform: none; }
+.mobile-topbar {
+  display: none; position: fixed; top: 0; left: 0; right: 0;
+  background: var(--glass-bg); backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--glass-border);
+  padding: 10px 14px; align-items: center; justify-content: space-between; z-index: 200;
+  min-height: 56px;
+}
+.mobile-logo { font-size: 15px; font-weight: 800; }
+.hamburger {
+  background: none; border: none; color: var(--text-main);
+  font-size: 24px; cursor: pointer;
+  width: 44px; height: 44px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--radius-sm);
+  transition: background var(--transition);
+}
+.hamburger:hover { background: rgba(0,180,216,0.1); }
+.mobile-bottom-nav {
+  display: none; position: fixed; bottom: 0; left: 0; right: 0;
+  background: var(--glass-bg); backdrop-filter: blur(20px);
+  border-top: 1px solid var(--glass-border); padding: 8px 4px 16px; z-index: 200;
+}
+.mobile-nav-items { display: flex; justify-content: space-around; }
+.mobile-nav-item { display: flex; flex-direction: column; align-items: center; gap: 3px; cursor: pointer; color: var(--text-muted); font-size: 10px; font-weight: 600; padding: 6px 10px; border-radius: var(--radius-sm); transition: all var(--transition); }
+.mobile-nav-item.active { color: var(--teal); }
+.mobile-nav-item .mn-icon { font-size: 20px; }
+.sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 250; backdrop-filter: blur(2px); }
+.sidebar-overlay.show { display: block; }
+
+/* PROFILE HERO */
+.profile-hero {
+  background: linear-gradient(135deg, var(--navy-mid), var(--navy-light));
+  border: 1px solid var(--glass-border); border-radius: var(--radius);
+  padding: 32px; margin-bottom: 24px; position: relative; overflow: hidden;
+}
+.profile-hero::before { content: '🩺'; position: absolute; right: -10px; top: -20px; font-size: 140px; opacity: 0.05; transform: rotate(20deg); pointer-events: none; }
+.profile-hero-grid { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: center; }
+.profile-greeting { font-size: 13px; color: var(--text-muted); font-weight: 500; margin-bottom: 4px; }
+.profile-name     { font-size: 30px; font-weight: 900; color: var(--white); letter-spacing: -0.8px; }
+.profile-target   { font-size: 14px; color: var(--teal); margin-top: 6px; font-weight: 600; }
+.profile-exam     { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+.profile-countdown { text-align: center; background: rgba(0,180,216,0.12); border: 1px solid rgba(0,180,216,0.3); border-radius: 14px; padding: 20px 28px; }
+.countdown-days  { font-size: 52px; font-weight: 900; color: var(--teal); line-height: 1; letter-spacing: -2px; }
+.countdown-label { font-size: 11px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
+.pulse-dot { display: inline-block; width: 8px; height: 8px; background: var(--success); border-radius: 50%; margin-right: 6px; animation: pulse 2s ease infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.7); } }
+.overall-progress-wrap { margin-top: 20px; }
+.overall-progress-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-muted); margin-bottom: 6px; }
+.overall-progress-bar { height: 10px; background: rgba(255,255,255,0.07); border-radius: 20px; overflow: hidden; }
+.overall-progress-fill { height: 100%; border-radius: 20px; background: linear-gradient(90deg, var(--teal), var(--gold)); transition: width 1s ease; }
+
+/* STAT CARDS */
+.stat-card {
+  background: var(--glass-bg); backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border); border-radius: var(--radius);
+  padding: 22px; display: flex; flex-direction: column; gap: 12px;
+  transition: all var(--transition); position: relative; overflow: hidden;
+}
+.stat-card::after { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; border-radius: var(--radius) var(--radius) 0 0; }
+.stat-card.teal::after   { background: linear-gradient(90deg, var(--teal), var(--mint)); }
+.stat-card.gold::after   { background: linear-gradient(90deg, var(--gold), var(--gold-light)); }
+.stat-card.green::after  { background: linear-gradient(90deg, var(--success), #00F5D4); }
+.stat-card.pink::after   { background: linear-gradient(90deg, var(--danger), #FF6B9D); }
+.stat-card.purple::after { background: linear-gradient(90deg, #8B5CF6, #A78BFA); }
+.stat-card:hover { transform: translateY(-4px); border-color: rgba(0,180,216,0.4); box-shadow: var(--shadow); }
+.stat-icon  { font-size: 28px; }
+.stat-value { font-size: 32px; font-weight: 900; color: var(--white); letter-spacing: -1px; line-height: 1; }
+.stat-label { font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+.stat-delta { font-size: 11px; color: var(--success); font-weight: 600; }
+
+/* DAILY TRACKER */
+.topic-tag-wrap { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.topic-tag { background: rgba(0,180,216,0.15); border: 1px solid rgba(0,180,216,0.3); color: var(--teal); border-radius: 20px; padding: 4px 12px; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 5px; }
+.topic-tag .remove-tag { cursor: pointer; opacity: 0.7; font-size: 14px; line-height: 1; }
+.topic-tag .remove-tag:hover { opacity: 1; }
+.day-entry-card { background: rgba(10,22,40,0.6); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); padding: 16px; margin-bottom: 12px; transition: all var(--transition); }
+.day-entry-card:hover { border-color: rgba(0,180,216,0.3); }
+.day-entry-card.completed { border-color: rgba(6,214,160,0.4); }
+.day-entry-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.day-entry-date   { font-weight: 700; font-size: 14px; }
+.day-entry-meta   { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+
+/* SUBJECTS */
+.subject-card { background: var(--glass-bg); backdrop-filter: blur(20px); border: 1px solid var(--glass-border); border-radius: var(--radius); padding: 24px; transition: all var(--transition); }
+.subject-card:hover { border-color: rgba(0,180,216,0.4); transform: translateY(-3px); }
+.subject-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px; }
+.subject-name   { font-size: 16px; font-weight: 800; color: var(--white); }
+.subject-emoji  { font-size: 28px; }
+.subject-stat-row { display: flex; gap: 16px; margin-bottom: 14px; }
+.subject-stat     { flex: 1; }
+.subject-stat-val { font-size: 22px; font-weight: 800; color: var(--white); }
+.subject-stat-lbl { font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; }
+.subject-chapters-input { display: flex; gap: 8px; margin-top: 12px; align-items: center; }
+
+/* SYLLABUS */
+.syllabus-subject { background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius); margin-bottom: 14px; overflow: hidden; }
+.syllabus-header { display: flex; justify-content: space-between; align-items: center; padding: 18px 22px; cursor: pointer; transition: background var(--transition); user-select: none; }
+.syllabus-header:hover { background: rgba(0,180,216,0.07); }
+.syllabus-header-left { display: flex; align-items: center; gap: 12px; }
+.syllabus-subject-name { font-size: 15px; font-weight: 700; }
+.syllabus-arrow { transition: transform var(--transition); font-size: 12px; color: var(--text-muted); }
+.syllabus-arrow.open { transform: rotate(180deg); }
+.syllabus-body { display: none; padding: 0 22px 20px; }
+.syllabus-body.open { display: block; }
+.topic-row { display: flex; align-items: center; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid rgba(255,255,255,0.04); gap: 12px; }
+.topic-row:last-child { border-bottom: none; }
+.topic-name { font-size: 13.5px; flex: 1; }
+.status-select { background: rgba(10,22,40,0.8); border: 1px solid var(--glass-border); border-radius: 8px; color: var(--text-main); font-size: 12px; padding: 5px 8px; font-family: 'Inter', sans-serif; cursor: pointer; outline: none; }
+.status-select.not-started { border-color: rgba(239,71,111,0.4); color: var(--danger); }
+.status-select.in-progress { border-color: rgba(255,183,3,0.4); color: var(--gold); }
+.status-select.completed   { border-color: rgba(6,214,160,0.4); color: var(--success); }
+
+/* MOCK TESTS */
+.mock-stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+.mock-stat     { background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); padding: 18px; text-align: center; }
+.mock-stat-val { font-size: 28px; font-weight: 900; color: var(--teal); }
+.mock-stat-lbl { font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; margin-top: 4px; }
+
+/* STREAK */
+.streak-hero { text-align: center; padding: 32px; background: linear-gradient(135deg, rgba(255,183,3,0.1), rgba(255,183,3,0.03)); border: 1px solid rgba(255,183,3,0.25); border-radius: var(--radius); margin-bottom: 24px; }
+.streak-fire   { font-size: 64px; display: block; margin-bottom: 8px; animation: fireWiggle 2s ease infinite; }
+@keyframes fireWiggle { 0%,100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg); } }
+.streak-number { font-size: 72px; font-weight: 900; color: var(--gold); letter-spacing: -3px; line-height: 1; }
+.streak-unit   { font-size: 18px; color: var(--text-muted); font-weight: 600; margin-top: 6px; }
+.badges-grid   { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 24px; }
+.badge-card { background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius); padding: 20px 12px; text-align: center; transition: all var(--transition); opacity: 0.4; }
+.badge-card.earned { opacity: 1; border-color: rgba(255,183,3,0.5); background: rgba(255,183,3,0.08); box-shadow: 0 0 24px rgba(255,183,3,0.15); animation: badgeGlow 3s ease infinite; }
+@keyframes badgeGlow { 0%,100% { box-shadow: 0 0 24px rgba(255,183,3,0.15); } 50% { box-shadow: 0 0 40px rgba(255,183,3,0.3); } }
+.badge-emoji { font-size: 36px; display: block; margin-bottom: 8px; }
+.badge-name  { font-size: 12px; font-weight: 700; color: var(--white); }
+.badge-req   { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+
+/* GOALS */
+.goal-item { display: flex; align-items: center; gap: 14px; padding: 13px 16px; background: rgba(10,22,40,0.6); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); margin-bottom: 10px; transition: all var(--transition); }
+.goal-item.done { border-color: rgba(6,214,160,0.3); background: rgba(6,214,160,0.05); }
+.goal-check { width: 22px; height: 22px; border-radius: 6px; border: 2px solid var(--glass-border); background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all var(--transition); flex-shrink: 0; }
+.goal-check.checked { background: var(--success); border-color: var(--success); }
+.goal-check.checked::after { content: '✓'; color: white; font-size: 13px; font-weight: 800; }
+.goal-text { flex: 1; font-size: 14px; }
+.goal-text.done { text-decoration: line-through; color: var(--text-muted); }
+.goal-del { cursor: pointer; color: var(--text-muted); transition: color var(--transition); font-size: 18px; }
+.goal-del:hover { color: var(--danger); }
+
+/* MOTIVATION */
+.quote-card { background: linear-gradient(135deg, rgba(0,180,216,0.12), rgba(0,150,199,0.06)); border: 1px solid rgba(0,180,216,0.3); border-radius: var(--radius); padding: 36px; text-align: center; position: relative; overflow: hidden; margin-bottom: 24px; }
+.quote-mark   { font-size: 80px; color: rgba(0,180,216,0.2); line-height: 0.5; position: absolute; top: 20px; left: 24px; font-family: Georgia, serif; }
+.quote-text   { font-size: 19px; font-weight: 600; color: var(--white); line-height: 1.6; position: relative; z-index: 1; font-style: italic; }
+.quote-author { font-size: 13px; color: var(--teal); margin-top: 14px; font-weight: 700; }
+.milestone-row  { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 24px; }
+.milestone-card { background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius); padding: 20px; text-align: center; transition: all var(--transition); }
+.milestone-card.reached { border-color: rgba(6,214,160,0.4); background: rgba(6,214,160,0.07); }
+.milestone-icon  { font-size: 30px; margin-bottom: 8px; display: block; }
+.milestone-label { font-size: 13px; font-weight: 700; color: var(--white); }
+.milestone-val   { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+
+/* CHARTS */
+.charts-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+.chart-card { background: var(--glass-bg); backdrop-filter: blur(20px); border: 1px solid var(--glass-border); border-radius: var(--radius); padding: 24px; }
+.chart-card.full { grid-column: 1 / -1; }
+
+/* WEEK STRIP */
+.week-strip { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+.week-day { flex: 1; min-width: 36px; aspect-ratio: 1; border-radius: 10px; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 10px; color: var(--text-muted); font-weight: 600; cursor: pointer; transition: all var(--transition); }
+.week-day.studied { background: rgba(0,180,216,0.25); border-color: rgba(0,180,216,0.5); color: var(--teal); }
+.week-day.today   { outline: 2px solid var(--teal); }
+.week-day-name { font-size: 9px; }
+.week-day-num  { font-size: 14px; font-weight: 800; }
+
+.empty-state { text-align: center; padding: 48px 24px; color: var(--text-muted); }
+.empty-state-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.5; }
+.empty-state-text { font-size: 15px; font-weight: 600; }
+.empty-state-sub  { font-size: 13px; margin-top: 6px; opacity: 0.7; }
+.topic-input-row  { display: flex; gap: 8px; }
+
+/* RESPONSIVE */
+@media (max-width: 1024px) {
+  .grid-4 { grid-template-columns: repeat(2, 1fr); }
+  .badges-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 768px) {
+  /* Sidebar */
+  .sidebar { transform: translateX(-100%); }
+  .sidebar.open { transform: translateX(0); box-shadow: 4px 0 32px rgba(0,0,0,0.6); }
+
+  /* Layout */
+  .main-content { margin-left: 0; padding: 72px 14px 86px; }
+  .mobile-topbar { display: flex; }
+  .mobile-bottom-nav { display: block; }
+
+  /* Grids */
+  .grid-2 { grid-template-columns: 1fr; }
+  .grid-3 { grid-template-columns: 1fr; }
+  .grid-4 { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .charts-grid { grid-template-columns: 1fr; }
+  .mock-stats-row { grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .milestone-row { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .badges-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .chart-card.full { grid-column: auto; }
+
+  /* Profile hero */
+  .profile-hero { padding: 20px; }
+  .profile-hero-grid { grid-template-columns: 1fr; gap: 16px; }
+  .profile-countdown { width: fit-content; }
+  .profile-name { font-size: 22px; }
+
+  /* Page headings */
+  .page-title { font-size: 20px; }
+  .page-subtitle { font-size: 13px; margin-bottom: 18px; }
+
+  /* Cards & glass */
+  .glass-card { padding: 16px; }
+
+  /* Stat cards */
+  .stat-card { padding: 14px 12px; }
+  .stat-value { font-size: 26px; }
+
+  /* Streak */
+  .streak-hero { padding: 24px 16px; }
+  .streak-number { font-size: 56px; }
+
+  /* Charts */
+  .chart-card { padding: 16px; }
+
+  /* Mock test subject inputs — 3 cols then 2 cols */
+  .mock-5-grid { grid-template-columns: repeat(3, 1fr) !important; gap: 10px !important; }
+
+  /* Tables */
+  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table { min-width: 600px; }
+  thead th, tbody td { padding: 9px 10px; font-size: 12px; }
+
+  /* Buttons */
+  .btn { padding: 12px 18px; min-height: 44px; }
+  .btn-google, .btn-whatsapp { min-height: 48px; }
+
+  /* Inputs */
+  input[type="text"], input[type="number"], input[type="date"],
+  input[type="email"], select, textarea { padding: 12px 14px; min-height: 44px; font-size: 15px; }
+  select { min-height: 44px; }
+
+  /* Topic input row */
+  .topic-input-row { flex-direction: row; }
+  .topic-input-row button { min-height: 44px; white-space: nowrap; }
+
+  /* Forms */
+  .subject-chapters-input { flex-direction: column; }
+  .subject-chapters-input input { width: 100%; }
+
+  /* Nav items touch */
+  .nav-item { padding: 12px 12px; min-height: 44px; }
+  .mobile-nav-item { padding: 8px 8px; min-height: 44px; }
+
+  /* Login / Payment */
+  .login-card { padding: 32px 22px; }
+  .payment-card { padding: 28px 20px; }
+  .price-amount { font-size: 38px; }
+
+  /* Save indicator */
+  #saveIndicator { top: 70px; right: 10px; }
+  #toast { bottom: 90px; right: 12px; left: 12px; text-align: center; justify-content: center; }
+
+  /* Heatmap */
+  #heatmapContainer { gap: 3px; }
+  #heatmapContainer > div { width: 11px !important; height: 11px !important; }
+
+  /* Syllabus header */
+  .syllabus-header { padding: 14px 16px; }
+  .syllabus-body { padding: 0 14px 16px; }
+  .topic-row { flex-direction: column; align-items: flex-start; gap: 6px; }
+  .status-select { width: 100%; min-height: 40px; }
+  .topic-name { font-size: 12.5px; }
+
+  /* Quote card */
+  .quote-card { padding: 24px 20px; }
+  .quote-text { font-size: 16px; }
+  .quote-mark { font-size: 60px; }
+
+  /* Goal items */
+  .goal-check { width: 28px; height: 28px; flex-shrink: 0; }
+  .goal-del { font-size: 22px; padding: 4px; }
+
+  /* Badges */
+  .badge-card { padding: 14px 8px; }
+  .badge-emoji { font-size: 28px; }
+  .badge-name { font-size: 11px; }
+
+  /* Subject rings - scrollable row */
+  #ringBio, #ringChem, #ringPhys, #ringEng, #ringLR { flex-shrink: 0; }
+
+  /* Milestone */
+  .milestone-card { padding: 14px 10px; }
+  .milestone-label { font-size: 12px; }
+
+  /* Week strip */
+  .week-day { min-width: 32px; }
+}
+
+@media (max-width: 480px) {
+  .grid-4 { grid-template-columns: repeat(2, 1fr); }
+  .mock-stats-row { grid-template-columns: 1fr; gap: 10px; }
+  .mock-5-grid { grid-template-columns: repeat(2, 1fr) !important; }
+  .countdown-days { font-size: 40px; }
+  .streak-number { font-size: 48px; }
+  .stat-value { font-size: 22px; }
+  .milestone-row { grid-template-columns: 1fr; }
+  .badges-grid { grid-template-columns: repeat(2, 1fr); }
+  .profile-hero { padding: 16px; }
+  .login-card { padding: 28px 16px; }
+  .login-title { font-size: 22px; }
+  .payment-card { padding: 24px 16px; }
+
+  /* Rings — make them smaller on tiny screens */
+  .ring-pct { font-size: 16px; }
+}
+
+  /* Subject rings — allow horizontal scroll on tiny screens */
+  .rings-scroll-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+  }
+  .rings-scroll-wrap > div {
+    display: flex;
+    gap: 16px;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    padding: 10px 2px;
+  }
+
+@media (max-width: 360px) {
+  .grid-4 { grid-template-columns: 1fr; }
+  .badges-grid { grid-template-columns: 1fr; }
+  .main-content { padding: 68px 10px 82px; }
+}
+</style>
+</head>
+<body>
+
+<!-- LOADING SCREEN -->
+<div id="loadingScreen">
+  <div class="spinner"></div>
+  <div class="loading-text">Connecting securely…</div>
+</div>
+
+<!-- LOGIN SCREEN -->
+<div id="loginScreen" style="display:none">
+  <div class="login-card">
+    <span class="login-logo">🩺</span>
+    <div class="login-title">PlanMDCAT</div>
+    <div class="login-sub">Your complete MDCAT preparation tracker.<br>Sign in to sync your progress across all devices.</div>
+    <button class="btn-google" onclick="handleGoogleSignIn()">
+      <svg class="google-icon" viewBox="0 0 24 24">
+        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
+        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+      </svg>
+      Sign in with Google
+    </button>
+    <div class="login-footer">By signing in you agree to use this app responsibly.<br>Your data is saved securely on Firebase.</div>
+  </div>
+</div>
+
+<!-- PAYMENT SCREEN -->
+<div id="paymentScreen" style="display:none;align-items:center;justify-content:center;min-height:100vh;position:relative;z-index:10;padding:20px">
+  <div class="payment-card">
+    <div class="payment-badge">⭐ Premium Access Required</div>
+    <div class="payment-title">PlanMDCAT Premium Access</div>
+    <div class="payment-sub">Get full access to all features till MDCAT 2026</div>
+    <div class="price-box">
+      <div class="price-amount">Rs. 3,000</div>
+      <div class="price-label">One-time payment — Valid till MDCAT 2026 🎯</div>
+    </div>
+    <div class="payment-steps">
+      <div class="payment-step"><div class="step-num">1</div><div class="step-text">Send <strong>Rs. 3,000</strong> via EasyPaisa to <strong>03483137803</strong></div></div>
+      <div class="payment-step"><div class="step-num">2</div><div class="step-text">Take a screenshot of your payment confirmation</div></div>
+      <div class="payment-step"><div class="step-num">3</div><div class="step-text">Send the screenshot on <strong>WhatsApp 03483137803</strong> to get instant access</div></div>
+    </div>
+    <div class="payment-contact-box">
+      <div class="contact-row"><span class="contact-label">📱 EasyPaisa</span><span class="contact-val">03483137803</span></div>
+      <div class="contact-row"><span class="contact-label">💬 WhatsApp</span><span class="contact-val">03483137803</span></div>
+    </div>
+    <div class="payment-note"><strong>⚡ Instant Access</strong> — Send payment screenshot on WhatsApp to get instant access. Our team activates your account within minutes!</div>
+    <a class="btn-whatsapp" href="https://wa.me/923483137803?text=Hi!%20I%20have%20paid%20Rs.3000%20for%20PlanMDCAT%20Premium%20Access.%20Here%20is%20my%20payment%20screenshot." target="_blank">💬 Send Screenshot on WhatsApp</a>
+    <button class="payment-logout" onclick="handleLogout()">🔒 Sign out from a different account</button>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div class="app-wrapper" id="appWrapper">
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">🩺</div>
+      <div class="logo-title">MDCAT Tracker</div>
+      <div class="logo-sub">Your path to MBBS</div>
+    </div>
+    <div class="sidebar-user" id="sidebarUser">
+      <div class="sidebar-user-avatar-placeholder" id="sidebarAvatarPlaceholder">?</div>
+      <div class="sidebar-user-info">
+        <div class="sidebar-user-name" id="sidebarUserName">Loading…</div>
+        <div class="sidebar-user-email" id="sidebarUserEmail"></div>
+      </div>
+    </div>
+    <div class="sidebar-nav">
+      <div class="nav-section-label">Overview</div>
+      <div class="nav-item active" onclick="navigateTo('dashboard')"><span class="nav-icon">📊</span> Dashboard</div>
+      <div class="nav-item" onclick="navigateTo('profile')"><span class="nav-icon">👤</span> My Profile</div>
+      <div class="nav-section-label">Study</div>
+      <div class="nav-item" onclick="navigateTo('daily')"><span class="nav-icon">📅</span> Daily Tracker</div>
+      <div class="nav-item" onclick="navigateTo('subjects')"><span class="nav-icon">📚</span> Subject Progress</div>
+      <div class="nav-item" onclick="navigateTo('syllabus')"><span class="nav-icon">✅</span> Syllabus Checklist</div>
+      <div class="nav-section-label">Performance</div>
+      <div class="nav-item" onclick="navigateTo('mocktest')"><span class="nav-icon">📝</span> Mock Tests</div>
+      <div class="nav-item" onclick="navigateTo('streak')"><span class="nav-icon">🔥</span> Study Streak</div>
+      <div class="nav-item" onclick="navigateTo('charts')"><span class="nav-icon">📈</span> Analytics</div>
+      <div class="nav-section-label">Goals</div>
+      <div class="nav-item" onclick="navigateTo('goals')"><span class="nav-icon">🎯</span> Weekly Goals</div>
+      <div class="nav-item" onclick="navigateTo('motivation')"><span class="nav-icon">💫</span> Motivation</div>
+    </div>
+    <button class="btn-logout" onclick="handleLogout()">🔒 Sign Out</button>
+    <div class="sidebar-footer"><span class="pulse-dot"></span> Syncing with Firebase</div>
+  </nav>
+
+  <div class="mobile-topbar">
+    <div class="mobile-logo">🩺 MDCAT</div>
+    <button class="hamburger" onclick="toggleSidebar()">☰</button>
+  </div>
+
+  <main class="main-content" id="mainContent">
+
+    <!-- DASHBOARD -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-title">Dashboard</div>
+      <div class="page-subtitle">Your complete MDCAT 2025-2026 preparation overview</div>
+      <div class="profile-hero" id="heroSection">
+        <div class="profile-hero-grid">
+          <div class="profile-name-wrap">
+            <div class="profile-greeting">Good day, Future Doctor 👋</div>
+            <div class="profile-name" id="heroName">Set up your profile →</div>
+            <div class="profile-target" id="heroTarget">Target Score: —</div>
+            <div class="profile-exam" id="heroExam">Exam Date: —</div>
+          </div>
+          <div class="profile-countdown">
+            <div class="countdown-days" id="heroDays">—</div>
+            <div class="countdown-label">Days Remaining</div>
+          </div>
+        </div>
+        <div class="overall-progress-wrap">
+          <div class="overall-progress-label"><span>Overall Syllabus Progress</span><span id="overallPct">0%</span></div>
+          <div class="overall-progress-bar"><div class="overall-progress-fill" id="overallFill" style="width:0%"></div></div>
+        </div>
+      </div>
+      <div class="grid-4" style="margin-bottom:24px">
+        <div class="stat-card teal"><div class="stat-icon">⏱️</div><div class="stat-value" id="statHours">0</div><div class="stat-label">Total Study Hours</div></div>
+        <div class="stat-card gold"><div class="stat-icon">❓</div><div class="stat-value" id="statMCQs">0</div><div class="stat-label">MCQs Solved</div></div>
+        <div class="stat-card green"><div class="stat-icon">📖</div><div class="stat-value" id="statChapters">0</div><div class="stat-label">Chapters Done</div></div>
+        <div class="stat-card pink"><div class="stat-icon">📝</div><div class="stat-value" id="statMocks">0</div><div class="stat-label">Mock Tests Taken</div></div>
+        <div class="stat-card purple"><div class="stat-icon">🔥</div><div class="stat-value" id="statStreak">0</div><div class="stat-label">Current Streak</div></div>
+        <div class="stat-card teal"><div class="stat-icon">🏆</div><div class="stat-value" id="statBestStreak">0</div><div class="stat-label">Longest Streak</div></div>
+        <div class="stat-card gold"><div class="stat-icon">🎯</div><div class="stat-value" id="statAvgTest">—</div><div class="stat-label">Avg Test Score</div></div>
+        <div class="stat-card green"><div class="stat-icon">⭐</div><div class="stat-value" id="statGoalRate">0%</div><div class="stat-label">Goal Completion</div></div>
+      </div>
+      <div class="glass-card" style="margin-bottom:24px">
+        <div class="section-title">📚 Subject Progress Rings</div>
+        <div class="rings-scroll-wrap"><div style="display:flex;gap:28px;flex-wrap:wrap;justify-content:center;padding:10px 0">
+          <div id="ringBio"></div><div id="ringChem"></div><div id="ringPhys"></div><div id="ringEng"></div><div id="ringLR"></div>
+        </div></div>
+      </div>
+      <div class="glass-card">
+        <div class="section-title">📅 Recent Study Sessions</div>
+        <div id="recentEntries"><div class="empty-state"><div class="empty-state-icon">📋</div><div class="empty-state-text">No sessions logged yet</div><div class="empty-state-sub">Go to Daily Tracker to add your first session</div></div></div>
+      </div>
+    </div>
+
+    <!-- PROFILE -->
+    <div class="page" id="page-profile">
+      <div class="page-title">My Profile</div>
+      <div class="page-subtitle">Customize your MDCAT preparation details</div>
+      <div class="glass-card" style="max-width:560px">
+        <div class="section-title">👤 Student Information</div>
+        <div class="form-group"><label>Your Name</label><input type="text" id="inputName" placeholder="e.g. Ayesha Khan"></div>
+        <div class="form-group"><label>Target Score (out of 180)</label><input type="number" id="inputTarget" placeholder="e.g. 160" min="0" max="180"></div>
+        <div class="form-group"><label>Exam Date</label><input type="date" id="inputExamDate"></div>
+        <div class="form-group"><label>Your University Goal</label><input type="text" id="inputUni" placeholder="e.g. Aga Khan University, KMDC"></div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="saveProfile()">💾 Save Profile</button>
+          <button class="btn btn-ghost" onclick="navigateTo('dashboard')">← Back to Dashboard</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- DAILY TRACKER -->
+    <div class="page" id="page-daily">
+      <div class="page-title">Daily Study Tracker</div>
+      <div class="page-subtitle">Log every study session to build your streak</div>
+      <div class="grid-2" style="margin-bottom:24px">
+        <div class="glass-card">
+          <div class="section-title">➕ Log Today's Session</div>
+          <div class="form-group"><label>Date</label><input type="date" id="dailyDate"></div>
+          <div class="grid-2" style="gap:12px">
+            <div class="form-group"><label>Study Hours</label><input type="number" id="dailyHours" placeholder="e.g. 3" min="0" max="24" step="0.5"></div>
+            <div class="form-group"><label>MCQs Solved</label><input type="number" id="dailyMCQs" placeholder="e.g. 50" min="0"></div>
+          </div>
+          <div class="form-group">
+            <label>Topics Studied</label>
+            <div class="topic-input-row">
+              <input type="text" id="topicInput" placeholder="Type a topic and press Add" onkeydown="if(event.key==='Enter') addTopic()">
+              <button class="btn btn-ghost" onclick="addTopic()" style="white-space:nowrap">+ Add</button>
+            </div>
+            <div class="topic-tag-wrap" id="topicTags"></div>
+          </div>
+          <div class="form-group"><label>Notes</label><textarea id="dailyNotes" placeholder="What did you learn today? Any difficulties?"></textarea></div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <button class="btn btn-primary" onclick="saveDailyEntry()">💾 Save Session</button>
+            <button class="btn btn-gold" onclick="markDayComplete()">✅ Mark Day Complete</button>
+          </div>
+        </div>
+        <div class="glass-card">
+          <div class="section-title">📆 This Week</div>
+          <div class="week-strip" id="weekStrip"></div>
+          <div class="section-title" style="margin-top:8px;font-size:14px">📊 Week Summary</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div style="background:rgba(0,180,216,0.1);border-radius:10px;padding:14px;text-align:center"><div style="font-size:24px;font-weight:900;color:var(--teal)" id="weekHours">0</div><div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase">Hours</div></div>
+            <div style="background:rgba(255,183,3,0.1);border-radius:10px;padding:14px;text-align:center"><div style="font-size:24px;font-weight:900;color:var(--gold)" id="weekMCQs">0</div><div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase">MCQs</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="glass-card">
+        <div class="section-title">📋 Study Log History</div>
+        <div id="dailyHistory"><div class="empty-state"><div class="empty-state-icon">📅</div><div class="empty-state-text">No sessions logged yet</div><div class="empty-state-sub">Add your first study session above</div></div></div>
+      </div>
+    </div>
+
+    <!-- SUBJECTS -->
+    <div class="page" id="page-subjects">
+      <div class="page-title">Subject Progress</div>
+      <div class="page-subtitle">Track chapters completed per subject — PMC MDCAT 2025-2026</div>
+      <div class="grid-2" id="subjectsGrid"></div>
+    </div>
+
+    <!-- SYLLABUS -->
+    <div class="page" id="page-syllabus">
+      <div class="page-title">Syllabus Checklist</div>
+      <div class="page-subtitle">Official PMC MDCAT 2025-2026 Curriculum — Track every topic</div>
+      <div class="glass-card" style="margin-bottom:20px">
+        <div style="display:flex;gap:24px;flex-wrap:wrap">
+          <div style="text-align:center"><div style="font-size:28px;font-weight:900;color:var(--teal)" id="syllabusTotal">0%</div><div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase">Overall</div></div>
+          <div style="flex:1;display:flex;align-items:center"><div style="width:100%"><div class="progress-bar-wrap" style="height:12px"><div class="progress-bar-fill" id="syllabusTotalBar" style="width:0%"></div></div></div></div>
+          <div style="display:flex;gap:16px;flex-wrap:wrap">
+            <div style="display:flex;align-items:center;gap:6px;font-size:12px"><div style="width:10px;height:10px;border-radius:3px;background:var(--danger)"></div><span style="color:var(--text-muted)">Not Started</span></div>
+            <div style="display:flex;align-items:center;gap:6px;font-size:12px"><div style="width:10px;height:10px;border-radius:3px;background:var(--gold)"></div><span style="color:var(--text-muted)">In Progress</span></div>
+            <div style="display:flex;align-items:center;gap:6px;font-size:12px"><div style="width:10px;height:10px;border-radius:3px;background:var(--success)"></div><span style="color:var(--text-muted)">Completed</span></div>
+          </div>
+        </div>
+      </div>
+      <div id="syllabusContainer"></div>
+    </div>
+
+    <!-- MOCK TEST -->
+    <div class="page" id="page-mocktest">
+      <div class="page-title">Mock Test Tracker</div>
+      <div class="page-subtitle">Record and analyze your practice test performance (Total: 180 MCQs)</div>
+      <div class="mock-stats-row">
+        <div class="mock-stat"><div class="mock-stat-val" id="mockBest">—</div><div class="mock-stat-lbl">Highest Score</div></div>
+        <div class="mock-stat"><div class="mock-stat-val" id="mockAvg">—</div><div class="mock-stat-lbl">Average Score</div></div>
+        <div class="mock-stat"><div class="mock-stat-val" id="mockTrend">—</div><div class="mock-stat-lbl">Trend</div></div>
+      </div>
+      <div class="glass-card" style="margin-bottom:24px">
+        <div class="section-title">➕ Add Test Result</div>
+        <div class="grid-2">
+          <div class="form-group"><label>Test Date</label><input type="date" id="mockDate"></div>
+          <div class="form-group"><label>Total Score (out of 180)</label><input type="number" id="mockTotal" placeholder="e.g. 140" min="0" max="180"></div>
+        </div>
+        <div class="mock-5-grid" style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:16px">
+          <div class="form-group" style="margin-bottom:0"><label>Bio /81</label><input type="number" id="mockBio" placeholder="e.g. 65" min="0" max="81"></div>
+          <div class="form-group" style="margin-bottom:0"><label>Chem /45</label><input type="number" id="mockChem" placeholder="e.g. 32" min="0" max="45"></div>
+          <div class="form-group" style="margin-bottom:0"><label>Phys /36</label><input type="number" id="mockPhys" placeholder="e.g. 25" min="0" max="36"></div>
+          <div class="form-group" style="margin-bottom:0"><label>Eng /9</label><input type="number" id="mockEng" placeholder="e.g. 7" min="0" max="9"></div>
+          <div class="form-group" style="margin-bottom:0"><label>Logic /9</label><input type="number" id="mockLR" placeholder="e.g. 7" min="0" max="9"></div>
+        </div>
+        <div class="form-group"><label>Weak Areas (comma separated)</label><input type="text" id="mockWeak" placeholder="e.g. Organic Chemistry, Respiratory System"></div>
+        <button class="btn btn-primary" onclick="saveMockTest()">💾 Save Test Result</button>
+      </div>
+      <div class="glass-card">
+        <div class="section-title">📋 Test History</div>
+        <div class="table-wrap">
+          <table id="mockTable">
+            <thead><tr><th>Date</th><th>Score</th><th>%</th><th>Bio/81</th><th>Chem/45</th><th>Phys/36</th><th>Eng/9</th><th>Logic/9</th><th>Weak Areas</th><th></th></tr></thead>
+            <tbody id="mockTableBody"></tbody>
+          </table>
+        </div>
+        <div id="mockEmpty" class="empty-state"><div class="empty-state-icon">📝</div><div class="empty-state-text">No tests recorded yet</div><div class="empty-state-sub">Add your first mock test result above</div></div>
+      </div>
+    </div>
+
+    <!-- STREAK -->
+    <div class="page" id="page-streak">
+      <div class="page-title">Study Streak</div>
+      <div class="page-subtitle">Build consistency — every day counts</div>
+      <div class="streak-hero">
+        <span class="streak-fire">🔥</span>
+        <div class="streak-number" id="streakCurrent">0</div>
+        <div class="streak-unit">Day Streak</div>
+        <div style="display:flex;justify-content:center;gap:28px;margin-top:20px;flex-wrap:wrap">
+          <div style="text-align:center"><div style="font-size:24px;font-weight:900;color:var(--white)" id="streakLongest">0</div><div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase">Longest Streak</div></div>
+          <div style="text-align:center"><div style="font-size:24px;font-weight:900;color:var(--white)" id="streakWeekly">0%</div><div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase">Weekly Consistency</div></div>
+          <div style="text-align:center"><div style="font-size:24px;font-weight:900;color:var(--white)" id="streakTotal">0</div><div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase">Total Days Studied</div></div>
+        </div>
+      </div>
+      <div class="section-title" style="margin-top:8px">🏅 Achievement Badges</div>
+      <div class="badges-grid">
+        <div class="badge-card" id="badge3"><span class="badge-emoji">🥉</span><div class="badge-name">3-Day Warrior</div><div class="badge-req">Study 3 days in a row</div></div>
+        <div class="badge-card" id="badge7"><span class="badge-emoji">🥈</span><div class="badge-name">Week Conqueror</div><div class="badge-req">Study 7 days in a row</div></div>
+        <div class="badge-card" id="badge14"><span class="badge-emoji">🥇</span><div class="badge-name">Fortnight Champion</div><div class="badge-req">Study 14 days in a row</div></div>
+        <div class="badge-card" id="badge30"><span class="badge-emoji">💎</span><div class="badge-name">Monthly Legend</div><div class="badge-req">Study 30 days in a row</div></div>
+      </div>
+      <div class="glass-card" style="margin-top:24px">
+        <div class="section-title">📅 Study Calendar (Last 60 Days)</div>
+        <div id="heatmapContainer" style="display:flex;flex-wrap:wrap;gap:4px;padding:8px 0"></div>
+        <div style="display:flex;align-items:center;gap:12px;margin-top:12px;font-size:11px;color:var(--text-muted)">
+          <span>Less</span>
+          <div style="width:12px;height:12px;border-radius:3px;background:rgba(255,255,255,0.07)"></div>
+          <div style="width:12px;height:12px;border-radius:3px;background:rgba(0,180,216,0.25)"></div>
+          <div style="width:12px;height:12px;border-radius:3px;background:rgba(0,180,216,0.6)"></div>
+          <div style="width:12px;height:12px;border-radius:3px;background:var(--teal)"></div>
+          <span>More</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ANALYTICS -->
+    <div class="page" id="page-charts">
+      <div class="page-title">Analytics</div>
+      <div class="page-subtitle">Visualize your preparation journey</div>
+      <div class="charts-grid">
+        <div class="chart-card"><div class="section-title" style="margin-bottom:12px">⏱️ Study Hours (Last 14 Days)</div><canvas id="chartHours" height="200"></canvas></div>
+        <div class="chart-card"><div class="section-title" style="margin-bottom:12px">❓ MCQs Solved (Last 14 Days)</div><canvas id="chartMCQs" height="200"></canvas></div>
+        <div class="chart-card full"><div class="section-title" style="margin-bottom:12px">📝 Mock Test Performance</div><canvas id="chartMock" height="140"></canvas></div>
+        <div class="chart-card"><div class="section-title" style="margin-bottom:12px">📚 Subject Breakdown</div><canvas id="chartSubjects" height="220"></canvas></div>
+        <div class="chart-card"><div class="section-title" style="margin-bottom:12px">✅ Syllabus Completion</div><canvas id="chartSyllabus" height="220"></canvas></div>
+      </div>
+    </div>
+
+    <!-- GOALS -->
+    <div class="page" id="page-goals">
+      <div class="page-title">Weekly Goals</div>
+      <div class="page-subtitle">Set targets, stay accountable</div>
+      <div class="grid-2" style="margin-bottom:24px">
+        <div class="glass-card">
+          <div class="section-title">➕ Add New Goal</div>
+          <div class="form-group"><label>Goal Description</label><input type="text" id="goalInput" placeholder="e.g. Complete Bioenergetics unit" onkeydown="if(event.key==='Enter') addGoal()"></div>
+          <div class="form-group">
+            <label>Category</label>
+            <select id="goalCategory">
+              <option value="📖 Study">📖 Study</option>
+              <option value="❓ MCQs">❓ MCQs</option>
+              <option value="📝 Test">📝 Test</option>
+              <option value="🔬 Biology">🔬 Biology</option>
+              <option value="⚗️ Chemistry">⚗️ Chemistry</option>
+              <option value="⚡ Physics">⚡ Physics</option>
+              <option value="📘 English">📘 English</option>
+              <option value="🧩 Logic">🧩 Logic</option>
+              <option value="🎯 Other">🎯 Other</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" onclick="addGoal()">➕ Add Goal</button>
+        </div>
+        <div class="glass-card">
+          <div class="section-title">📊 Completion Rate</div>
+          <div id="goalRingWrap" style="display:flex;justify-content:center;margin-bottom:16px"></div>
+          <div style="text-align:center;color:var(--text-muted);font-size:13px" id="goalCountText">0 of 0 goals completed</div>
+        </div>
+      </div>
+      <div class="glass-card">
+        <div class="section-title">🎯 This Week's Goals</div>
+        <div id="goalsList"><div class="empty-state"><div class="empty-state-icon">🎯</div><div class="empty-state-text">No goals set yet</div><div class="empty-state-sub">Add your weekly targets above</div></div></div>
+      </div>
+    </div>
+
+    <!-- MOTIVATION -->
+    <div class="page" id="page-motivation">
+      <div class="page-title">Motivation Corner</div>
+      <div class="page-subtitle">Fuel your journey to becoming a doctor</div>
+      <div class="quote-card">
+        <div class="quote-mark">"</div>
+        <div class="quote-text" id="quoteText">Loading...</div>
+        <div class="quote-author" id="quoteAuthor">— Unknown</div>
+      </div>
+      <div style="text-align:center;margin-bottom:28px"><button class="btn btn-ghost" onclick="changeQuote()">✨ New Quote</button></div>
+      <div class="glass-card" style="margin-bottom:24px;text-align:center;padding:32px">
+        <div style="font-size:36px;margin-bottom:12px">🌅</div>
+        <div style="font-size:15px;color:var(--white);font-weight:600" id="dailyMsg">Every expert was once a beginner. You're one step closer today.</div>
+      </div>
+      <div class="section-title">🏆 Progress Milestones</div>
+      <div class="milestone-row" id="milestonesGrid"></div>
+    </div>
+
+  </main>
+
+  <nav class="mobile-bottom-nav">
+    <div class="mobile-nav-items">
+      <div class="mobile-nav-item active" onclick="navigateTo('dashboard')"><span class="mn-icon">📊</span> Home</div>
+      <div class="mobile-nav-item" onclick="navigateTo('daily')"><span class="mn-icon">📅</span> Daily</div>
+      <div class="mobile-nav-item" onclick="navigateTo('syllabus')"><span class="mn-icon">✅</span> Syllabus</div>
+      <div class="mobile-nav-item" onclick="navigateTo('mocktest')"><span class="mn-icon">📝</span> Tests</div>
+      <div class="mobile-nav-item" onclick="navigateTo('motivation')"><span class="mn-icon">💫</span> More</div>
+    </div>
+  </nav>
+</div>
+
+<div id="toast">✅ Saved!</div>
+<div id="saveIndicator">☁️ Saving…</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// OFFICIAL PMC MDCAT 2025-2026 SYLLABUS
+// Source: PM&DC Uniform Curriculum MDCAT 2025 (Final, 26-05-2025)
+// Total: 180 MCQs | Bio:81 | Chem:45 | Phys:36 | Eng:9 | LR:9
+// ═══════════════════════════════════════════════════════════════
+const SYLLABUS = {
+
+  // ── BIOLOGY: 16 Units, 81 MCQs (45%) ──────────────────────
+  Biology: [
+    // Unit 1: Acellular Life
+    'Unit 1 | Viruses — Classification by Structure, Strands, Diseases & Hosts',
+    'Unit 1 | AIDS & HIV Infection — Symptoms, Transmission & Cause',
+
+    // Unit 2: Bioenergetics
+    'Unit 2 | Cellular Respiration of Proteins, Fats & Glucose',
+
+    // Unit 3: Biological Molecules
+    'Unit 3 | Definition & Classification of Biological Molecules',
+    'Unit 3 | Biological Importance of Water — Polarity, Specific Heat, Cohesion',
+    'Unit 3 | Carbohydrates — Monosaccharides, Oligosaccharides, Polysaccharides',
+    'Unit 3 | Proteins — Amino Acids & Protein Structure',
+    'Unit 3 | Lipids — Phospholipids, Triglycerides, Acylglycerol',
+    'Unit 3 | RNA — Structure & Function',
+    'Unit 3 | DNA — Double Helical Structure (Watson & Crick), Gene Definition',
+    'Unit 3 | Conjugated Molecules — Glycolipids & Glycoproteins',
+
+    // Unit 4: Cell Structure & Function
+    'Unit 4 | Cell Structure — Animal vs Plant Cell Comparison',
+    'Unit 4 | Prokaryotic vs Eukaryotic Cells',
+    'Unit 4 | Cytoplasmic Organelles — Nucleus, ER, Golgi Apparatus, Mitochondria',
+    'Unit 4 | Chromosomes — Structure, Chemical Composition & Function',
+
+    // Unit 5: Coordination & Control
+    'Unit 5 | Receptors — As Transducers Sensitive to Stimuli',
+    'Unit 5 | Neurons — Structure: Cell Body, Dendrites, Axon, Myelin Sheath',
+    'Unit 5 | Nerve Impulse — Definition & Transmission',
+    'Unit 5 | Reflexes — Classification & Reflex Arc Components',
+    'Unit 5 | Brain — Main Parts: Brain Stem, Midbrain, Cerebellum, Cerebrum',
+
+    // Unit 6: Enzymes
+    'Unit 6 | Enzyme Characteristics',
+    'Unit 6 | Mode of Enzyme Action — Mechanism',
+    'Unit 6 | Factors Affecting Enzyme Rate — Temperature, pH, Concentration',
+    'Unit 6 | Enzyme Inhibitors',
+
+    // Unit 7: Evolution
+    'Unit 7 | Concept of Evolution — Origin of Life',
+    'Unit 7 | Lamarckism — Theory of Inheritance of Acquired Characters',
+    'Unit 7 | Darwinism — Theory of Natural Selection',
+
+    // Unit 8: Reproduction
+    'Unit 8 | Human Reproductive System — Male & Female, Hormonal Regulation',
+    'Unit 8 | Menstrual Cycle — Phases & Hormonal Role',
+    'Unit 8 | Sexually Transmitted Diseases — Causative Agents & Symptoms',
+
+    // Unit 9: Support & Movement
+    'Unit 9 | Human Skeleton — Cartilage, Muscle & Bone Characteristics',
+    'Unit 9 | Muscles — Smooth, Cardiac & Skeletal Comparison',
+    'Unit 9 | Skeletal Muscle — Ultrastructure & Contraction Mechanism',
+    'Unit 9 | Joints — Classification',
+    'Unit 9 | Arthritis — Definition',
+
+    // Unit 10: Inheritance
+    'Unit 10 | Mendel\'s Laws — Law of Independent Assortment',
+    'Unit 10 | Gene Linkage & Crossing Over',
+    'Unit 10 | X-linked Recessive Inheritance — Sex-linkage & Hemophilia',
+
+    // Unit 11: Circulation
+    'Unit 11 | Human Heart — General Structure',
+    'Unit 11 | Cardiac Cycle & Phases of Heartbeat',
+    'Unit 11 | Blood Vessels — Arteries, Veins & Capillaries',
+    'Unit 11 | Lymphatic System — Nodes, Vessels & Organs',
+
+    // Unit 12: Immunity
+    'Unit 12 | Specific Defense Mechanism — Antibodies & Lymphocytes',
+
+    // Unit 13: Respiration
+    'Unit 13 | Human Respiratory System — Structure & Gas Exchange',
+    'Unit 13 | Effect of Smoking on Respiratory System',
+
+    // Unit 14: Digestion
+    'Unit 14 | Human Digestive System — Parts & Functions',
+
+    // Unit 15: Homeostasis
+    'Unit 15 | Kidney — Structure, Urinary System & Osmoregulation',
+    'Unit 15 | Kidney — Glomerular Filtration, Reabsorption & Tubular Secretion',
+    'Unit 15 | Kidney — Kidney Stones & Kidney Failure',
+    'Unit 15 | Thermoregulation',
+    'Unit 15 | Excretion — Nitrogenous Waste Compounds',
+
+    // Unit 16: Biotechnology
+    'Unit 16 | Biotechnology — Vaccines & Health Problem Prevention',
+    'Unit 16 | Biotechnology — Disease Diagnosis (DNA/RNA Probes, Monoclonal Antibodies)',
+    'Unit 16 | Biotechnology — Products for Disease Treatment',
+  ],
+
+  // ── CHEMISTRY: 20 Units, 45 MCQs (25%) ───────────────────
+  Chemistry: [
+    // Unit 1: Fundamentals
+    'Unit 1 | Moles & Avogadro\'s Number — Stoichiometric Calculations',
+    'Unit 1 | Limiting & Excess Reactants',
+    'Unit 1 | Theoretical Yield, Actual Yield & Percentage Yield',
+
+    // Unit 2: Atomic Structure
+    'Unit 2 | Discovery of Proton & Planck\'s Quantum Theory — Photon',
+    'Unit 2 | Quantum Numbers — Orbitals, Energy Levels & Sub-levels',
+    'Unit 2 | Shapes of s, p Orbitals & Hydrogen Spectrum',
+    'Unit 2 | Electronic Configuration — Aufbau, Pauli & Hund\'s Rule',
+
+    // Unit 3: Gases
+    'Unit 3 | Kinetic Molecular Theory of Gases',
+    'Unit 3 | Boyle\'s Law, Charles\'s Law & Absolute Zero',
+    'Unit 3 | Ideal Gas Equation, Gas Constant (R) & Real vs Ideal Gas',
+
+    // Unit 4: Liquids
+    'Unit 4 | Properties of Liquids — Kinetic Molecular Theory',
+    'Unit 4 | Evaporation, Vapour Pressure & Boiling Point',
+    'Unit 4 | Hydrogen Bonding in H₂O, NH₃ & HF; Anomalous Behaviour of Water',
+
+    // Unit 5: Solids
+    'Unit 5 | Crystalline Solids — Types & Factors Affecting Ionic Crystal Shape',
+    'Unit 5 | Crystal Lattice & Lattice Energy',
+
+    // Unit 6: Chemical Equilibrium
+    'Unit 6 | Chemical Equilibrium — Reversible Reactions',
+    'Unit 6 | Le Chatelier\'s Principle',
+    'Unit 6 | Solubility Product (Ksp) & Common Ion Effect',
+    'Unit 6 | Buffer Solutions',
+    'Unit 6 | Haber\'s Process — Synthesis of Ammonia',
+
+    // Unit 7: Reaction Kinetics
+    'Unit 7 | Rate of Reaction, Rate Law & Order of Reaction',
+    'Unit 7 | Activation Energy, Activated Complex & Rate Constant',
+    'Unit 7 | Factors Affecting Rate — Concentration, Temperature, Surface Area',
+
+    // Unit 8: Thermochemistry
+    'Unit 8 | Thermodynamics — Exothermic & Endothermic Reactions',
+    'Unit 8 | System, Surroundings, Internal Energy, Enthalpy & Heat Capacity',
+    'Unit 8 | First Law of Thermodynamics & Hess\'s Law',
+
+    // Unit 9: Electrochemistry
+    'Unit 9 | Redox Reactions — Oxidation & Reduction, Balancing Equations',
+    'Unit 9 | Standard Hydrogen Electrode (SHE) & Electrode Potential',
+
+    // Unit 10: Chemical Bonding
+    'Unit 10 | VSEPR Theory — Molecular Shapes & Sigma/Pi Bonds',
+    'Unit 10 | Hybridization & Molecular Polarity',
+    'Unit 10 | Bond Energy, Bond Length & Ionic Character of Covalent Bond',
+
+    // Unit 11: S & P Block Elements
+    'Unit 11 | Periodic Trends — Atomic Radii, Ionization Energy, Electronegativity',
+    'Unit 11 | S-, P-, D- & F-Block Demarcation in Periodic Table',
+    'Unit 11 | Reactions of Group I Elements (with Water, O₂, Cl₂)',
+    'Unit 11 | Reactions of Group II & Group IV Elements',
+
+    // Unit 12: Transition Elements
+    'Unit 12 | Electronic Structure of d-Block Elements & Ions',
+
+    // Unit 13: Organic Chemistry Fundamentals
+    'Unit 13 | Definition & Classification of Organic Compounds',
+    'Unit 13 | Functional Groups & Stereoisomerism (Types)',
+
+    // Unit 14: Hydrocarbons
+    'Unit 14 | Alkanes — Nomenclature & Free Radical Mechanism (Initiation, Propagation, Termination)',
+    'Unit 14 | Alkenes — IUPAC Nomenclature, Shape (σ & π bonds), Structure & Reactivity',
+    'Unit 14 | Benzene — MOT, Resonance, Reactivity & Electrophilic Substitution (Nitration, Friedel-Crafts)',
+    'Unit 14 | Alkynes — IUPAC Naming, Preparation, Acidity & Reactions (Hydrogenation, Hydration)',
+    'Unit 14 | Substitution vs Addition Reactions',
+
+    // Unit 15: Alkyl Halides
+    'Unit 15 | Alkyl Halides — Nomenclature, Structure & Reactivity',
+    'Unit 15 | Nucleophilic Substitution Reactions (SN1, SN2)',
+    'Unit 15 | Elimination Reactions (E1, E2)',
+
+    // Unit 16: Alcohols & Phenols
+    'Unit 16 | Alcohols — Nomenclature, Structure, Reactivity & Preparation of Ethers/Esters',
+    'Unit 16 | Phenols — Nomenclature, Structure, Reactivity & Electrophilic Aromatic Substitution',
+
+    // Unit 17: Aldehydes & Ketones
+    'Unit 17 | Aldehydes & Ketones — Nomenclature, Preparation & Reactivity',
+    'Unit 17 | Nucleophilic Addition, Reduction to Alcohols & Oxidation Reactions',
+
+    // Unit 18: Carboxylic Acids
+    'Unit 18 | Carboxylic Acids — Nomenclature, Structure & Preparation',
+    'Unit 18 | Reactivity & Conversion to Derivatives (Acyl Halides, Anhydrides, Esters)',
+
+    // Unit 19: Macromolecules
+    'Unit 19 | Proteins — Classification, Structure-Function Relationship & Nutritional Importance',
+    'Unit 19 | Enzymes as Biocatalysts',
+
+    // Unit 20: Industrial Chemistry
+    'Unit 20 | Adhesives — Types & Applications',
+    'Unit 20 | Dyes — Types & Uses',
+    'Unit 20 | Polymers — Condensation & Addition Polymers',
+  ],
+
+  // ── PHYSICS: 16 Units, 36 MCQs (20%) ─────────────────────
+  Physics: [
+    // Unit 1: Vectors & Equilibrium
+    'Unit 1 | Vector Addition Using Rectangular Components',
+    'Unit 1 | Scalar Product & Vector Product of Two Vectors',
+
+    // Unit 2: Force & Motion
+    'Unit 2 | Displacement, Velocity, Acceleration & Displacement-Time Graphs',
+    'Unit 2 | Uniform vs Variable Acceleration',
+    'Unit 2 | Projectile Motion — 2D, Horizontal & Vertical Components',
+    'Unit 2 | Projectile Parameters — Max Height, Range, Time of Flight, Launch Angle',
+    'Unit 2 | Newton\'s Laws of Motion — Application in Various Contexts',
+    'Unit 2 | Linear Momentum & Newton\'s 2nd Law as Rate of Change of Momentum',
+    'Unit 2 | Conservation of Momentum — Newton\'s 3rd Law & Elastic/Inelastic Collisions',
+
+    // Unit 3: Work & Energy
+    'Unit 3 | Work, Kinetic Energy & Potential Energy (Gravitational PE, Reference Levels)',
+    'Unit 3 | Power (P = F·v), Energy Losses & Efficiency',
+
+    // Unit 4: Rotational & Circular Motion
+    'Unit 4 | Angular Displacement (Radians, Degrees, Revolutions) & Angular Velocity',
+    'Unit 4 | Relationship Between Linear & Angular Variables (Displacement, Velocity, Acceleration)',
+
+    // Unit 5: Fluid Dynamics
+    'Unit 5 | Terminal Velocity & Fluid Drag',
+    'Unit 5 | Fluid Flow — Laminar, Turbulent & Steady Flow',
+    'Unit 5 | Equation of Continuity (Av = constant)',
+    'Unit 5 | Bernoulli\'s Equation & Applications in Blood Physics',
+
+    // Unit 6: Waves
+    'Unit 6 | Wave Motion — Progressive Waves, Characteristics (Amplitude, Wavelength, v = fλ)',
+    'Unit 6 | Transverse vs Longitudinal Waves & Energy Transfer',
+    'Unit 6 | Speed of Sound — Newton\'s Formula & Laplace\'s Correction',
+    'Unit 6 | Superposition, Interference of Sound Waves',
+    'Unit 6 | Stationary Waves — Nodes, Antinodes, Strings & Organ Pipes',
+    'Unit 6 | Simple Harmonic Motion (SHM) — Characteristics, Circular Motion & SHM',
+
+    // Unit 7: Thermodynamics
+    'Unit 7 | Heat Transfer & Thermal Equilibrium',
+    'Unit 7 | Specific Heat, Molar Specific Heat & Work Done in Volume Change',
+    'Unit 7 | First Law of Thermodynamics & Cp − Cv = R Relation',
+
+    // Unit 8: Electrostatics
+    'Unit 8 | Coulomb\'s Law & Electric Field Concept',
+    'Unit 8 | Electric Field Intensity — Point Charge, Infinite Sheet & Field Lines',
+    'Unit 8 | Electric Potential & Potential Energy Due to Point Charge',
+    'Unit 8 | Charging & Discharging of Capacitor through Resistance',
+
+    // Unit 9: Current Electricity
+    'Unit 9 | Ohm\'s Law, Resistivity & Temperature Coefficient',
+    'Unit 9 | Internal Resistance & Maximum Power Transfer',
+
+    // Unit 10: Electromagnetism
+    'Unit 10 | Magnetic Flux Density, Magnetic Flux (ΦB = B·A)',
+    'Unit 10 | Motion of Charged Particle in Magnetic Field',
+
+    // Unit 11: Electromagnetic Induction
+    'Unit 11 | Faraday\'s Law of Electromagnetic Induction & Lenz\'s Law',
+    'Unit 11 | Transformers — Step-up & Step-down, Construction & Working',
+
+    // Unit 12: Alternating Current
+    'Unit 12 | AC Phase — Lag & Lead in AC Circuits (Resistor, Capacitor, Inductor)',
+    'Unit 12 | Electromagnetic Waves — EM Spectrum (Radio Waves to Gamma Rays)',
+
+    // Unit 13: Electronics
+    'Unit 13 | Rectification — Half-wave & Full-wave using Diodes',
+    'Unit 13 | PN Junction — Forward & Reverse Biasing',
+
+    // Unit 14: Dawn of Modern Physics
+    'Unit 14 | Quantum Theory — Photon Energy & Particle Model of Light',
+
+    // Unit 15: Atomic Spectra
+    'Unit 15 | Atomic Spectra & Line Spectrum',
+
+    // Unit 16: Nuclear Physics
+    'Unit 16 | Atomic Nucleus — Protons, Neutrons & Electrons (Model)',
+    'Unit 16 | Spontaneous & Random Nuclear Decay',
+    'Unit 16 | Half-life & Rate of Decay (λ = 0.693/T½)',
+    'Unit 16 | Biological Effects of Radiation & Medical Uses',
+  ],
+
+  // ── ENGLISH: 3 Units, 9 MCQs (5%) ────────────────────────
+  English: [
+    // Unit 1: Reading & Thinking Skills
+    'Unit 1 | Scanning for Short Answers & Deducing Meanings from Context',
+    'Unit 1 | Figurative Language — How Writers Use Language Analytically',
+
+    // Unit 2: Formal & Lexical Aspects
+    'Unit 2 | Vocabulary in Context — Synonyms, Irony, Parody & Satire',
+    'Unit 2 | Pronoun-Antecedent Agreement & Tenses',
+    'Unit 2 | Infinitives, Gerunds & Adverbs — Position & Usage',
+    'Unit 2 | Prepositions — Position, Time, Movement & Direction',
+    'Unit 2 | Active & Passive Voice & Direct/Indirect Speech',
+    'Unit 2 | Sentence Structure — Classes, Phrases & Punctuation',
+
+    // Unit 3: Writing Skills
+    'Unit 3 | Proofreading & Editing — Faulty Structure, Subject-Verb Agreement & Spelling',
+  ],
+
+  // ── LOGICAL REASONING: 6 Units, 9 MCQs (5%) ──────────────
+  'Logical Reasoning': [
+    // Unit 1: Critical Thinking
+    'Unit 1 | Critical Thinking — Evaluate Statements as True/False Using Logic',
+
+    // Unit 2: Letter & Symbol Series
+    'Unit 2 | Letter & Symbol Series — Arithmetic & Geometric Patterns',
+
+    // Unit 3: Logical Deductions
+    'Unit 3 | Logical Deductions — Syllogisms & Structured Reasoning',
+
+    // Unit 4: Logical Problems
+    'Unit 4 | Logical Problems — Deductive Puzzles & Arrangements',
+
+    // Unit 5: Course of Action
+    'Unit 5 | Course of Action — Identify Logically Appropriate Decisions',
+
+    // Unit 6: Cause & Effect
+    'Unit 6 | Cause & Effect — Identify Cause-Effect Relationships Between Statements',
+  ],
+};
+
+// ═══════════════════════════════════════════════════════════════
+// QUOTES & MESSAGES
+// ═══════════════════════════════════════════════════════════════
+const QUOTES = [
+  { text: "The art of medicine consists of amusing the patient while nature cures the disease.", author: "Voltaire" },
+  { text: "Wherever the art of medicine is loved, there is also a love of humanity.", author: "Hippocrates" },
+  { text: "Success is the sum of small efforts repeated day in and day out.", author: "Robert Collier" },
+  { text: "Believe you can and you're halfway there.", author: "Theodore Roosevelt" },
+  { text: "Hard work beats talent when talent doesn't work hard.", author: "Tim Notke" },
+  { text: "Medicine is learned by the bedside and not in the classroom.", author: "Sir William Osler" },
+  { text: "The good physician treats the disease; the great physician treats the patient.", author: "Sir William Osler" },
+  { text: "It always seems impossible until it's done.", author: "Nelson Mandela" },
+  { text: "Dreams don't work unless you do.", author: "John C. Maxwell" },
+  { text: "Your only limit is your mind. Push it. Break it. Rebuild it.", author: "Unknown" },
+  { text: "The future belongs to those who believe in the beauty of their dreams.", author: "Eleanor Roosevelt" },
+  { text: "Every moment you study is an investment in someone else's survival.", author: "Unknown" },
+  { text: "Pakistan needs brilliant doctors. You could be one of them.", author: "PlanMDCAT" },
+  { text: "Strive not to be a success, but rather to be of value.", author: "Albert Einstein" },
+  { text: "Today's preparation is tomorrow's performance. Don't skip.", author: "Unknown" },
+];
+
+const DAILY_MESSAGES = [
+  "Every page you study today is a life you may save tomorrow. Keep going! 🌟",
+  "MBBS is not a destination, it's the beginning of your mission. Study hard! 💪",
+  "The stethoscope around your neck is waiting. Earn it one chapter at a time. ✨",
+  "Be so good they can't ignore you. Study with purpose today. 🎯",
+  "Today's preparation is tomorrow's performance. Don't skip. 📚",
+  "Pakistan needs brilliant doctors. You could be one of them. 🇵🇰",
+  "Consistency beats intensity. Show up every day. 🔥",
+];
+
+const SUBJECT_EMOJIS = { Biology:'🔬', Chemistry:'⚗️', Physics:'⚡', English:'📘', 'Logical Reasoning':'🧩' };
+
+// ═══════════════════════════════════════════════════════════════
+// APP STATE
+// Updated MCQ totals to official PMC 2025-2026 weightage:
+// Bio:81 | Chem:45 | Phys:36 | Eng:9 | LR:9 | Total:180
+// ═══════════════════════════════════════════════════════════════
+let state = {
+  profile:  { name:'', target:160, examDate:'', uni:'' },
+  daily:    [],
+  subjects: {
+    Biology:            { done:0, total:81,  color:'#06D6A0' },
+    Chemistry:          { done:0, total:45,  color:'#00B4D8' },
+    Physics:            { done:0, total:36,  color:'#8B5CF6' },
+    English:            { done:0, total:9,   color:'#FFB703' },
+    'Logical Reasoning':{ done:0, total:9,   color:'#EF476F' },
+  },
+  syllabus:   {},
+  mockTests:  [],
+  goals:      [],
+  quoteIndex: 0,
+};
+
+let currentTopics = [];
+let currentUser   = null;
+let saveTimeout   = null;
+let charts        = {};
+
+// ═══════════════════════════════════════════════════════════════
+// AUTH FLOW
+// ═══════════════════════════════════════════════════════════════
+window._onAuthReady = async function(user, paid) {
+  const loadingEl  = document.getElementById('loadingScreen');
+  const loginEl    = document.getElementById('loginScreen');
+  const paymentEl  = document.getElementById('paymentScreen');
+  const appEl      = document.getElementById('appWrapper');
+
+  loadingEl.style.display = 'none';
+
+  if (!user) {
+    loginEl.style.display   = 'flex';
+    paymentEl.style.display = 'none';
+    appEl.style.display     = 'none';
+    return;
+  }
+
+  loginEl.style.display = 'none';
+  currentUser = user;
+
+  if (!paid) {
+    paymentEl.style.display = 'flex';
+    appEl.style.display     = 'none';
+    return;
+  }
+
+  paymentEl.style.display = 'none';
+  appEl.style.display     = 'flex';
+
+  updateSidebarUser(user);
+  await loadAllData();
+
+  initDailyDate();
+  state.quoteIndex = Math.floor(Math.random() * QUOTES.length);
+  renderDashboard();
+  renderWeekStrip();
+  renderWeekSummary();
+};
+
+function updateSidebarUser(user) {
+  document.getElementById('sidebarUserName').textContent  = user.displayName || 'Student';
+  document.getElementById('sidebarUserEmail').textContent = user.email || '';
+  const placeholder = document.getElementById('sidebarAvatarPlaceholder');
+  if (user.photoURL) {
+    placeholder.outerHTML = `<img src="${user.photoURL}" class="sidebar-user-avatar" id="sidebarAvatarPlaceholder" onerror="this.style.display='none'">`;
+  } else {
+    placeholder.textContent = (user.displayName || user.email || '?')[0].toUpperCase();
+  }
+}
+
+async function handleGoogleSignIn() {
+  document.dispatchEvent(new CustomEvent('mdcat_google_signin'));
+}
+
+async function handleLogout() {
+  try {
+    await window._firebaseSignOut(window._firebaseAuth);
+    state = {
+      profile:  { name:'', target:160, examDate:'', uni:'' },
+      daily:    [],
+      subjects: {
+        Biology:            { done:0, total:81,  color:'#06D6A0' },
+        Chemistry:          { done:0, total:45,  color:'#00B4D8' },
+        Physics:            { done:0, total:36,  color:'#8B5CF6' },
+        English:            { done:0, total:9,   color:'#FFB703' },
+        'Logical Reasoning':{ done:0, total:9,   color:'#EF476F' },
+      },
+      syllabus: {}, mockTests: [], goals: [], quoteIndex: 0
+    };
+    currentUser = null;
+  } catch(e) { console.error(e); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FIRESTORE DATA LAYER
+// ═══════════════════════════════════════════════════════════════
+function rootDocRef() { return window._firebaseDoc(window._firebaseDb, 'users', currentUser.uid); }
+
+async function loadAllData() {
+  if (!currentUser) return;
+  try {
+    const rootSnap = await window._firebaseGetDoc(rootDocRef());
+    if (rootSnap.exists()) {
+      const d = rootSnap.data();
+      if (d.profile)   state.profile   = { ...state.profile,   ...d.profile   };
+      if (d.subjects)  state.subjects  = { ...state.subjects,  ...d.subjects  };
+      if (d.daily)     state.daily     = d.daily;
+      if (d.syllabus)  state.syllabus  = d.syllabus;
+      if (d.mockTests) state.mockTests = d.mockTests;
+      if (d.goals)     state.goals     = d.goals;
+    }
+    Object.values(SYLLABUS).flat().forEach(t => { if (!state.syllabus[t]) state.syllabus[t] = 'not-started'; });
+  } catch(e) { console.error('loadAllData error:', e); }
+}
+
+function scheduleSave() {
+  clearTimeout(saveTimeout);
+  showSaveIndicator();
+  saveTimeout = setTimeout(saveAllData, 1500);
+}
+
+async function saveAllData() {
+  if (!currentUser) return;
+  try {
+    await window._firebaseSetDoc(rootDocRef(), {
+      profile: state.profile,
+      subjects: state.subjects,
+      email: currentUser.email,
+      displayName: currentUser.displayName || '',
+      paid: true,
+      daily: state.daily,
+      syllabus: state.syllabus,
+      mockTests: state.mockTests,
+      goals: state.goals,
+    }, { merge: true });
+    hideSaveIndicator();
+  } catch(e) { console.error('saveAllData error:', e); hideSaveIndicator(); }
+}
+
+function showSaveIndicator() { document.getElementById('saveIndicator').classList.add('show'); }
+function hideSaveIndicator() { document.getElementById('saveIndicator').classList.remove('show'); }
+
+// ═══════════════════════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════════════════════
+function navigateTo(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelectorAll('.mobile-nav-item').forEach(n => n.classList.remove('active'));
+
+  const el = document.getElementById('page-' + page);
+  if (el) el.classList.add('active');
+
+  document.querySelectorAll('.nav-item').forEach(n => {
+    if (n.getAttribute('onclick') && n.getAttribute('onclick').includes("'" + page + "'")) n.classList.add('active');
+  });
+  document.querySelectorAll('.mobile-nav-item').forEach(n => {
+    if (n.getAttribute('onclick') && n.getAttribute('onclick').includes("'" + page + "'")) n.classList.add('active');
+  });
+
+  closeSidebar();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  if (page === 'dashboard')  renderDashboard();
+  if (page === 'daily')      { renderDailyHistory(); renderWeekStrip(); renderWeekSummary(); }
+  if (page === 'subjects')   renderSubjects();
+  if (page === 'syllabus')   renderSyllabus();
+  if (page === 'mocktest')   { renderMockTable(); renderMockStats(); }
+  if (page === 'streak')     renderStreak();
+  if (page === 'charts')     renderCharts();
+  if (page === 'goals')      renderGoals();
+  if (page === 'motivation') renderMotivation();
+  if (page === 'profile')    loadProfileForm();
+}
+
+function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); document.getElementById('sidebarOverlay').classList.toggle('show'); }
+function closeSidebar()   { document.getElementById('sidebar').classList.remove('open'); document.getElementById('sidebarOverlay').classList.remove('show'); }
+
+// ═══════════════════════════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════════════════════════
+function showToast(msg, type='success') {
+  const t = document.getElementById('toast');
+  t.innerHTML = (type==='success' ? '✅' : type==='error' ? '❌' : 'ℹ️') + ' ' + msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PROFILE
+// ═══════════════════════════════════════════════════════════════
+function saveProfile() {
+  const name   = document.getElementById('inputName').value.trim();
+  const target = parseInt(document.getElementById('inputTarget').value) || 160;
+  const date   = document.getElementById('inputExamDate').value;
+  const uni    = document.getElementById('inputUni').value.trim();
+  if (!name) { showToast('Please enter your name', 'error'); return; }
+  state.profile = { name, target, examDate: date, uni };
+  scheduleSave();
+  showToast('Profile saved!');
+  renderHero();
+}
+
+function loadProfileForm() {
+  document.getElementById('inputName').value     = state.profile.name     || '';
+  document.getElementById('inputTarget').value   = state.profile.target   || '';
+  document.getElementById('inputExamDate').value = state.profile.examDate || '';
+  document.getElementById('inputUni').value      = state.profile.uni      || '';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// HERO
+// ═══════════════════════════════════════════════════════════════
+function renderHero() {
+  const p = state.profile;
+  const displayName = p.name || (currentUser && currentUser.displayName) || '';
+  document.getElementById('heroName').textContent   = displayName ? 'Dr. ' + displayName + ' (Future)' : 'Set up your profile →';
+  document.getElementById('heroTarget').textContent = 'Target Score: ' + (p.target || '—') + ' / 180';
+  let examText = p.examDate ? '🗓️ Exam: ' + formatDate(p.examDate) : '📅 Exam Date: Not set';
+  if (p.uni) examText += ' | 🏥 ' + p.uni;
+  document.getElementById('heroExam').textContent = examText;
+  if (p.examDate) {
+    const diff = Math.ceil((new Date(p.examDate) - new Date()) / 86400000);
+    document.getElementById('heroDays').textContent = Math.max(0, diff);
+  } else {
+    document.getElementById('heroDays').textContent = '—';
+  }
+  const overallPct = calcOverallProgress();
+  document.getElementById('overallPct').textContent  = overallPct + '%';
+  document.getElementById('overallFill').style.width = overallPct + '%';
+}
+
+function calcOverallProgress() {
+  let total = 0, done = 0;
+  Object.values(SYLLABUS).forEach(topics => {
+    topics.forEach(topic => {
+      total++;
+      if ((state.syllabus[topic] || 'not-started') === 'completed') done++;
+    });
+  });
+  return total ? Math.round((done / total) * 100) : 0;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════════════════════════════
+function renderDashboard() {
+  renderHero();
+  const totalHours    = state.daily.reduce((s, d) => s + (parseFloat(d.hours) || 0), 0);
+  const totalMCQs     = state.daily.reduce((s, d) => s + (parseInt(d.mcqs) || 0), 0);
+  let   totalChapters = 0;
+  Object.values(state.subjects).forEach(sub => totalChapters += (parseInt(sub.done) || 0));
+
+  document.getElementById('statHours').textContent    = totalHours.toFixed(1);
+  document.getElementById('statMCQs').textContent     = totalMCQs.toLocaleString();
+  document.getElementById('statChapters').textContent = totalChapters;
+  document.getElementById('statMocks').textContent    = state.mockTests.length;
+
+  const { streak, best } = calcStreak();
+  document.getElementById('statStreak').textContent     = streak;
+  document.getElementById('statBestStreak').textContent = best;
+
+  if (state.mockTests.length) {
+    const avg = state.mockTests.reduce((s, m) => s + parseInt(m.total), 0) / state.mockTests.length;
+    document.getElementById('statAvgTest').textContent = Math.round(avg);
+  }
+
+  const goals = state.goals;
+  if (goals.length) {
+    const rate = Math.round((goals.filter(g => g.done).length / goals.length) * 100);
+    document.getElementById('statGoalRate').textContent = rate + '%';
+  }
+
+  const subjects = [
+    { id:'ringBio',  name:'Biology',   key:'Biology',           color:'#06D6A0' },
+    { id:'ringChem', name:'Chemistry', key:'Chemistry',         color:'#00B4D8' },
+    { id:'ringPhys', name:'Physics',   key:'Physics',           color:'#8B5CF6' },
+    { id:'ringEng',  name:'English',   key:'English',           color:'#FFB703' },
+    { id:'ringLR',   name:'Logic',     key:'Logical Reasoning', color:'#EF476F' },
+  ];
+  subjects.forEach(sub => {
+    const s   = state.subjects[sub.key] || { done:0, total:10 };
+    const pct = s.total ? Math.round((s.done / s.total) * 100) : 0;
+    document.getElementById(sub.id).innerHTML = buildRing(pct, sub.name, sub.color, 100);
+  });
+
+  const el     = document.getElementById('recentEntries');
+  const sorted = [...state.daily].sort((a,b) => b.date.localeCompare(a.date)).slice(0, 5);
+  if (!sorted.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📋</div><div class="empty-state-text">No sessions logged yet</div><div class="empty-state-sub">Go to Daily Tracker to add your first session</div></div>`;
+    return;
+  }
+  el.innerHTML = sorted.map(d => `
+    <div class="day-entry-card ${d.completed ? 'completed' : ''}">
+      <div class="day-entry-header">
+        <div class="day-entry-date">${formatDate(d.date)} ${d.completed ? '<span class="badge badge-success">✅ Done</span>' : ''}</div>
+        <div style="font-size:13px;color:var(--text-muted)">${d.hours}h | ${d.mcqs} MCQs</div>
+      </div>
+      <div class="day-entry-meta">${(d.topics||[]).map(t => `<span class="badge badge-teal">📌 ${t}</span>`).join('')}</div>
+      ${d.notes ? `<div style="font-size:12px;color:var(--text-muted);margin-top:8px">${d.notes}</div>` : ''}
+    </div>`).join('');
+}
+
+function buildRing(pct, label, color, size=100) {
+  const r    = (size/2) - 10;
+  const circ = 2 * Math.PI * r;
+  const off  = circ - (pct/100) * circ;
+  return `<div class="ring-wrap" style="width:${size}px;height:${size}px;flex-direction:column">
+    <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+      <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="8"/>
+      <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="${color}" stroke-width="8"
+        stroke-dasharray="${circ}" stroke-dashoffset="${off}" stroke-linecap="round" style="transition:stroke-dashoffset 1s ease"/>
+    </svg>
+    <div class="ring-text"><div class="ring-pct" style="color:${color};font-size:${size>90?18:14}px">${pct}%</div><div class="ring-label">${label}</div></div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DAILY TRACKER
+// ═══════════════════════════════════════════════════════════════
+function initDailyDate() { const d = document.getElementById('dailyDate'); if (d) d.value = todayStr(); }
+
+function addTopic() {
+  const inp = document.getElementById('topicInput');
+  const val = inp.value.trim();
+  if (!val) return;
+  currentTopics.push(val); inp.value = '';
+  renderTopicTags();
+}
+
+function renderTopicTags() {
+  document.getElementById('topicTags').innerHTML = currentTopics.map((t,i) =>
+    `<span class="topic-tag">${t}<span class="remove-tag" onclick="removeTopic(${i})">×</span></span>`
+  ).join('');
+}
+
+function removeTopic(i) { currentTopics.splice(i, 1); renderTopicTags(); }
+
+function saveDailyEntry() {
+  const date  = document.getElementById('dailyDate').value || todayStr();
+  const hours = parseFloat(document.getElementById('dailyHours').value) || 0;
+  const mcqs  = parseInt(document.getElementById('dailyMCQs').value) || 0;
+  const notes = document.getElementById('dailyNotes').value.trim();
+  if (!hours && !mcqs && !currentTopics.length) { showToast('Please enter at least hours or MCQs', 'error'); return; }
+  const existing = state.daily.findIndex(d => d.date === date);
+  const entry    = { date, hours, mcqs, topics:[...currentTopics], notes, completed: existing >= 0 ? state.daily[existing].completed : false };
+  if (existing >= 0) state.daily[existing] = entry; else state.daily.push(entry);
+  scheduleSave();
+  showToast('Session saved! Keep it up 💪');
+  currentTopics = []; renderTopicTags();
+  document.getElementById('dailyHours').value = '';
+  document.getElementById('dailyMCQs').value  = '';
+  document.getElementById('dailyNotes').value  = '';
+  renderDailyHistory(); renderWeekStrip(); renderWeekSummary();
+}
+
+function markDayComplete() {
+  const date     = document.getElementById('dailyDate').value || todayStr();
+  const existing = state.daily.findIndex(d => d.date === date);
+  if (existing < 0) { showToast('Save a session first', 'error'); return; }
+  state.daily[existing].completed = true;
+  scheduleSave(); showToast('Day marked as complete! 🏅');
+  renderDailyHistory(); renderWeekStrip();
+}
+
+function deleteDailyEntry(date) {
+  state.daily = state.daily.filter(d => d.date !== date);
+  scheduleSave(); showToast('Entry deleted');
+  renderDailyHistory(); renderWeekStrip(); renderWeekSummary();
+}
+
+function renderDailyHistory() {
+  const el = document.getElementById('dailyHistory');
+  if (!state.daily.length) { el.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📅</div><div class="empty-state-text">No sessions logged yet</div><div class="empty-state-sub">Add your first study session above</div></div>`; return; }
+  const sorted = [...state.daily].sort((a,b) => b.date.localeCompare(a.date));
+  el.innerHTML = sorted.map(d => `
+    <div class="day-entry-card ${d.completed ? 'completed' : ''}">
+      <div class="day-entry-header">
+        <div style="display:flex;align-items:center;gap:10px"><div class="day-entry-date">${formatDate(d.date)}</div>${d.completed ? '<span class="badge badge-success">✅ Completed</span>' : ''}</div>
+        <button class="btn btn-danger" style="padding:5px 12px;font-size:12px" onclick="deleteDailyEntry('${d.date}')">🗑️</button>
+      </div>
+      <div class="day-entry-meta">
+        <span class="badge badge-teal">⏱️ ${d.hours}h</span>
+        <span class="badge badge-gold">❓ ${d.mcqs} MCQs</span>
+        ${(d.topics||[]).map(t => `<span class="badge" style="background:rgba(139,92,246,0.2);color:#A78BFA">📌 ${t}</span>`).join('')}
+      </div>
+      ${d.notes ? `<div style="font-size:12.5px;color:var(--text-muted);margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.06)">📝 ${d.notes}</div>` : ''}
+    </div>`).join('');
+}
+
+function renderWeekStrip() {
+  const el = document.getElementById('weekStrip'); if (!el) return;
+  const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const today = new Date();
+  const studiedDates = new Set(state.daily.filter(d => d.hours > 0 || d.completed).map(d => d.date));
+  let html = '';
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(today); d.setDate(today.getDate() - i);
+    const ds = d.toISOString().slice(0, 10);
+    html += `<div class="week-day ${studiedDates.has(ds)?'studied':''} ${i===0?'today':''}">
+      <span class="week-day-name">${days[d.getDay()]}</span>
+      <span class="week-day-num">${d.getDate()}</span>
+      ${studiedDates.has(ds) ? '✓' : ''}
+    </div>`;
+  }
+  el.innerHTML = html;
+}
+
+function renderWeekSummary() {
+  const today = new Date(); let weekHours = 0, weekMCQs = 0;
+  state.daily.forEach(d => {
+    const diff = Math.floor((today - new Date(d.date)) / 86400000);
+    if (diff >= 0 && diff < 7) { weekHours += parseFloat(d.hours)||0; weekMCQs += parseInt(d.mcqs)||0; }
+  });
+  const wh = document.getElementById('weekHours'); const wm = document.getElementById('weekMCQs');
+  if (wh) wh.textContent = weekHours.toFixed(1);
+  if (wm) wm.textContent = weekMCQs;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SUBJECTS
+// ═══════════════════════════════════════════════════════════════
+function renderSubjects() {
+  const el = document.getElementById('subjectsGrid');
+  // Official MCQ count labels
+  const MCQ_LABELS = { Biology:'81 MCQs (45%)', Chemistry:'45 MCQs (25%)', Physics:'36 MCQs (20%)', English:'9 MCQs (5%)', 'Logical Reasoning':'9 MCQs (5%)' };
+  el.innerHTML = Object.entries(state.subjects).map(([name, sub]) => {
+    const pct = sub.total ? Math.round((sub.done / sub.total) * 100) : 0;
+    return `
+      <div class="subject-card">
+        <div class="subject-header">
+          <div>
+            <div class="subject-name">${name}</div>
+            <div style="font-size:11px;color:var(--teal);margin-top:2px;font-weight:700">${MCQ_LABELS[name] || ''}</div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:3px">${pct}% Complete</div>
+          </div>
+          <div class="subject-emoji">${SUBJECT_EMOJIS[name]||'📖'}</div>
+        </div>
+        <div class="subject-stat-row">
+          <div class="subject-stat"><div class="subject-stat-val" style="color:${sub.color}">${sub.done}</div><div class="subject-stat-lbl">Done</div></div>
+          <div class="subject-stat"><div class="subject-stat-val">${sub.total}</div><div class="subject-stat-lbl">Total</div></div>
+          <div class="subject-stat"><div class="subject-stat-val" style="color:${sub.color}">${pct}%</div><div class="subject-stat-lbl">Progress</div></div>
+        </div>
+        <div class="progress-bar-wrap" style="height:10px;margin-bottom:14px">
+          <div class="progress-bar-fill" style="width:${pct}%;background:linear-gradient(90deg,${sub.color},${sub.color}99)"></div>
+        </div>
+        <div class="subject-chapters-input">
+          <label style="white-space:nowrap;margin-bottom:0;font-size:12px">Chapters done:</label>
+          <input type="number" value="${sub.done}" min="0" max="${sub.total}" onchange="updateSubjectDone('${name}', this.value)" style="width:70px;text-align:center;padding:7px 8px">
+          <span style="font-size:12px;color:var(--text-muted)">/ ${sub.total}</span>
+        </div>
+        <div class="subject-chapters-input" style="margin-top:8px">
+          <label style="white-space:nowrap;margin-bottom:0;font-size:12px">Total chapters:</label>
+          <input type="number" value="${sub.total}" min="1" onchange="updateSubjectTotal('${name}', this.value)" style="width:70px;text-align:center;padding:7px 8px">
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function updateSubjectDone(name, val) { state.subjects[name].done = Math.min(parseInt(val)||0, state.subjects[name].total); scheduleSave(); showToast('Progress updated!'); renderSubjects(); }
+function updateSubjectTotal(name, val) { state.subjects[name].total = Math.max(1, parseInt(val)||1); scheduleSave(); renderSubjects(); }
+
+// ═══════════════════════════════════════════════════════════════
+// SYLLABUS CHECKLIST
+// ═══════════════════════════════════════════════════════════════
+function renderSyllabus() {
+  const container = document.getElementById('syllabusContainer');
+  const s = state.syllabus;
+  container.innerHTML = '';
+  let grandTotal = 0, grandDone = 0;
+
+  Object.entries(SYLLABUS).forEach(([subject, topics]) => {
+    const done   = topics.filter(t => (s[t]||'not-started') === 'completed').length;
+    const inProg = topics.filter(t => (s[t]||'not-started') === 'in-progress').length;
+    const pct    = Math.round((done / topics.length) * 100);
+    grandTotal  += topics.length;
+    grandDone   += done;
+
+    const div = document.createElement('div');
+    div.className = 'syllabus-subject';
+    div.innerHTML = `
+      <div class="syllabus-header" onclick="toggleSyllabus(this)">
+        <div class="syllabus-header-left">
+          <span>${SUBJECT_EMOJIS[subject]||'📖'}</span>
+          <span class="syllabus-subject-name">${subject}</span>
+          <span class="badge badge-success">${done}/${topics.length} done</span>
+          ${inProg ? `<span class="badge badge-gold">${inProg} in progress</span>` : ''}
+        </div>
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;min-width:80px">
+            <span style="font-size:13px;font-weight:700;color:var(--teal)">${pct}%</span>
+            <div class="progress-bar-wrap" style="width:80px;height:6px"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
+          </div>
+          <span class="syllabus-arrow">▼</span>
+        </div>
+      </div>
+      <div class="syllabus-body">
+        ${topics.map(topic => {
+          const status = s[topic] || 'not-started';
+          return `<div class="topic-row">
+            <span class="topic-name">${topic}</span>
+            <select class="status-select ${status}" onchange="updateTopicStatus('${topic.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}', this.value, this)">
+              <option value="not-started" ${status==='not-started'?'selected':''}>❌ Not Started</option>
+              <option value="in-progress" ${status==='in-progress'?'selected':''}>🔄 In Progress</option>
+              <option value="completed"   ${status==='completed'  ?'selected':''}>✅ Completed</option>
+            </select>
+          </div>`;
+        }).join('')}
+      </div>`;
+    container.appendChild(div);
+  });
+
+  const overallPct = grandTotal ? Math.round((grandDone / grandTotal) * 100) : 0;
+  document.getElementById('syllabusTotal').textContent    = overallPct + '%';
+  document.getElementById('syllabusTotalBar').style.width = overallPct + '%';
+}
+
+function toggleSyllabus(header) {
+  const body  = header.nextElementSibling;
+  const arrow = header.querySelector('.syllabus-arrow');
+  body.classList.toggle('open'); arrow.classList.toggle('open');
+}
+
+function updateTopicStatus(topic, status, sel) {
+  state.syllabus[topic] = status;
+  scheduleSave();
+  sel.className = 'status-select ' + status;
+  renderSyllabus();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MOCK TESTS — Updated max to 180
+// ═══════════════════════════════════════════════════════════════
+function saveMockTest() {
+  const date  = document.getElementById('mockDate').value || todayStr();
+  const total = parseInt(document.getElementById('mockTotal').value) || 0;
+  const bio   = parseInt(document.getElementById('mockBio').value)   || 0;
+  const chem  = parseInt(document.getElementById('mockChem').value)  || 0;
+  const phys  = parseInt(document.getElementById('mockPhys').value)  || 0;
+  const eng   = parseInt(document.getElementById('mockEng').value)   || 0;
+  const lr    = parseInt(document.getElementById('mockLR').value)    || 0;
+  const weak  = document.getElementById('mockWeak').value.trim();
+  if (!total) { showToast('Please enter a total score', 'error'); return; }
+  state.mockTests.push({ date, total, bio, chem, phys, eng, lr, weak });
+  scheduleSave(); showToast('Test result saved!');
+  ['mockDate','mockTotal','mockBio','mockChem','mockPhys','mockEng','mockLR','mockWeak'].forEach(id => { document.getElementById(id).value = ''; });
+  renderMockTable(); renderMockStats();
+}
+
+function deleteMock(i) { state.mockTests.splice(i, 1); scheduleSave(); renderMockTable(); renderMockStats(); showToast('Test deleted'); }
+
+function renderMockTable() {
+  const tbody = document.getElementById('mockTableBody');
+  const empty = document.getElementById('mockEmpty');
+  if (!state.mockTests.length) { tbody.innerHTML = ''; empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+  tbody.innerHTML = [...state.mockTests].sort((a,b) => b.date.localeCompare(a.date)).map((m, i) => {
+    const pct = Math.round((m.total / 180) * 100);
+    return `<tr>
+      <td>${formatDate(m.date)}</td>
+      <td><strong>${m.total}</strong></td>
+      <td><span class="badge ${pct>=70?'badge-success':pct>=55?'badge-gold':'badge-danger'}">${pct}%</span></td>
+      <td>${m.bio}</td><td>${m.chem}</td><td>${m.phys}</td><td>${m.eng}</td><td>${m.lr}</td>
+      <td style="font-size:12px;color:var(--text-muted)">${m.weak||'—'}</td>
+      <td><button class="btn btn-danger" style="padding:5px 10px;font-size:12px" onclick="deleteMock(${state.mockTests.length-1-i})">🗑️</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderMockStats() {
+  if (!state.mockTests.length) {
+    ['mockBest','mockAvg','mockTrend'].forEach(id => document.getElementById(id).textContent = '—');
+    return;
+  }
+  const scores = state.mockTests.map(m => parseInt(m.total));
+  document.getElementById('mockBest').textContent = Math.max(...scores);
+  document.getElementById('mockAvg').textContent  = Math.round(scores.reduce((a,b)=>a+b,0) / scores.length);
+  if (scores.length >= 2) {
+    const recent = scores.slice(-3); const older = scores.slice(-6,-3);
+    if (older.length) {
+      const diff = recent.reduce((a,b)=>a+b,0)/recent.length - older.reduce((a,b)=>a+b,0)/older.length;
+      document.getElementById('mockTrend').innerHTML =
+        diff > 0 ? `<span style="color:var(--success)">📈 +${Math.round(diff)}</span>` :
+        diff < 0 ? `<span style="color:var(--danger)">📉 ${Math.round(diff)}</span>` :
+        `<span style="color:var(--teal)">➡️ Stable</span>`;
+    } else { document.getElementById('mockTrend').textContent = scores.length + ' tests'; }
+  } else { document.getElementById('mockTrend').textContent = 'Need more data'; }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// STREAK
+// ═══════════════════════════════════════════════════════════════
+function calcStreak() {
+  const studiedDates = new Set(state.daily.filter(d => d.hours > 0 || d.completed).map(d => d.date));
+  let streak = 0; const d = new Date();
+  while (true) { const ds = d.toISOString().slice(0,10); if (studiedDates.has(ds)) { streak++; d.setDate(d.getDate()-1); } else break; }
+  let best = 0, cur = 0;
+  const allDates = [...studiedDates].sort();
+  for (let i = 0; i < allDates.length; i++) {
+    if (i===0) { cur = 1; } else { const diff = (new Date(allDates[i]) - new Date(allDates[i-1])) / 86400000; cur = diff===1 ? cur+1 : 1; }
+    best = Math.max(best, cur);
+  }
+  return { streak, best };
+}
+
+function renderStreak() {
+  const { streak, best } = calcStreak();
+  const studiedDates = new Set(state.daily.filter(d => d.hours > 0 || d.completed).map(d => d.date));
+  document.getElementById('streakCurrent').textContent = streak;
+  document.getElementById('streakLongest').textContent = best;
+  document.getElementById('streakTotal').textContent   = studiedDates.size;
+  let weekDays = 0;
+  for (let i = 0; i < 7; i++) { const d = new Date(); d.setDate(d.getDate()-i); if (studiedDates.has(d.toISOString().slice(0,10))) weekDays++; }
+  document.getElementById('streakWeekly').textContent = Math.round((weekDays/7)*100) + '%';
+  [3,7,14,30].forEach(n => { const el = document.getElementById('badge'+n); if (el) el.classList.toggle('earned', best >= n); });
+  renderHeatmap(studiedDates);
+}
+
+function renderHeatmap(studiedDates) {
+  const el = document.getElementById('heatmapContainer'); let html = '';
+  for (let i = 59; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate()-i);
+    const ds  = d.toISOString().slice(0,10);
+    const day = state.daily.find(e => e.date === ds);
+    const hrs = day ? (parseFloat(day.hours)||0) : 0;
+    let bg = 'rgba(255,255,255,0.07)';
+    if      (hrs > 6) bg = 'var(--teal)';
+    else if (hrs > 3) bg = 'rgba(0,180,216,0.6)';
+    else if (hrs > 0) bg = 'rgba(0,180,216,0.25)';
+    else if (studiedDates.has(ds)) bg = 'rgba(0,180,216,0.2)';
+    html += `<div title="${ds} — ${hrs}h" style="width:14px;height:14px;border-radius:3px;background:${bg};transition:all 0.3s;cursor:pointer" onmouseover="this.style.opacity=0.7" onmouseout="this.style.opacity=1"></div>`;
+  }
+  el.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CHARTS — Updated mock max to 180
+// ═══════════════════════════════════════════════════════════════
+function renderCharts() {
+  const colors = { teal:'#00B4D8', gold:'#FFB703', success:'#06D6A0', danger:'#EF476F', purple:'#8B5CF6' };
+  const labels14 = [], hoursData = [], mcqsData = [];
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate()-i);
+    const ds = d.toISOString().slice(0,10);
+    labels14.push(d.toLocaleDateString('en-US', { month:'short', day:'numeric' }));
+    const entry = state.daily.find(e => e.date === ds);
+    hoursData.push(entry ? (parseFloat(entry.hours)||0) : 0);
+    mcqsData.push(entry  ? (parseInt(entry.mcqs)||0)   : 0);
+  }
+  const baseOpts = {
+    responsive: true,
+    plugins: { legend: { labels: { color:'#7FA8C9', font:{ family:'Inter' } } } },
+    scales: {
+      x: { ticks:{ color:'#7FA8C9', font:{ family:'Inter', size:11 } }, grid:{ color:'rgba(255,255,255,0.04)' } },
+      y: { ticks:{ color:'#7FA8C9', font:{ family:'Inter', size:11 } }, grid:{ color:'rgba(255,255,255,0.04)' } }
+    }
+  };
+
+  if (charts.hours)    charts.hours.destroy();
+  charts.hours = new Chart(document.getElementById('chartHours'), { type:'bar', data:{ labels:labels14, datasets:[{ label:'Hours', data:hoursData, backgroundColor:'rgba(0,180,216,0.5)', borderColor:colors.teal, borderWidth:2, borderRadius:6 }] }, options: baseOpts });
+
+  if (charts.mcqs)     charts.mcqs.destroy();
+  charts.mcqs  = new Chart(document.getElementById('chartMCQs'),  { type:'line', data:{ labels:labels14, datasets:[{ label:'MCQs Solved', data:mcqsData, borderColor:colors.gold, backgroundColor:'rgba(255,183,3,0.12)', borderWidth:2, fill:true, tension:0.4, pointBackgroundColor:colors.gold, pointRadius:4 }] }, options: baseOpts });
+
+  if (charts.mock)     charts.mock.destroy();
+  const mockLabels = state.mockTests.map(m => formatDate(m.date));
+  const mockScores = state.mockTests.map(m => parseInt(m.total));
+  if (state.mockTests.length) {
+    charts.mock = new Chart(document.getElementById('chartMock'), {
+      type:'line',
+      data:{ labels:mockLabels, datasets:[{ label:'Total Score (/180)', data:mockScores, borderColor:colors.success, backgroundColor:'rgba(6,214,160,0.1)', borderWidth:2.5, fill:true, tension:0.4, pointBackgroundColor:colors.success, pointRadius:5 }] },
+      options:{ ...baseOpts, scales:{ ...baseOpts.scales, y:{ ...baseOpts.scales.y, min:0, max:180 } } }
+    });
+    // Draw passing line at 99 (55% of 180)
+  } else {
+    const p = document.getElementById('chartMock').parentElement;
+    if (!p.querySelector('.empty-state')) p.innerHTML += '<div class="empty-state"><div class="empty-state-icon">📝</div><div class="empty-state-text">No mock test data yet</div></div>';
+  }
+
+  const subNames = Object.keys(state.subjects);
+  const subPcts  = subNames.map(n => { const s=state.subjects[n]; return s.total ? Math.round((s.done/s.total)*100) : 0; });
+  if (charts.subjects) charts.subjects.destroy();
+  charts.subjects = new Chart(document.getElementById('chartSubjects'), {
+    type:'doughnut',
+    data:{ labels:subNames, datasets:[{ data:subPcts, backgroundColor:['#06D6A0','#00B4D8','#8B5CF6','#FFB703','#EF476F'], borderColor:'rgba(10,22,40,0.8)', borderWidth:3 }] },
+    options:{ responsive:true, plugins:{ legend:{ position:'bottom', labels:{ color:'#7FA8C9', font:{ family:'Inter' }, padding:16 } } } }
+  });
+
+  const syllabusLabels = Object.keys(SYLLABUS);
+  const syllabusPcts   = syllabusLabels.map(subj => {
+    const topics = SYLLABUS[subj]; const done = topics.filter(t => (state.syllabus[t]||'not-started')==='completed').length;
+    return Math.round((done/topics.length)*100);
+  });
+  if (charts.syllabus) charts.syllabus.destroy();
+  charts.syllabus = new Chart(document.getElementById('chartSyllabus'), {
+    type:'bar',
+    data:{ labels:['Bio','Chem','Phys','Eng','Logic'], datasets:[{ label:'Completion %', data:syllabusPcts, backgroundColor:['rgba(6,214,160,0.5)','rgba(0,180,216,0.5)','rgba(139,92,246,0.5)','rgba(255,183,3,0.5)','rgba(239,71,111,0.5)'], borderColor:['#06D6A0','#00B4D8','#8B5CF6','#FFB703','#EF476F'], borderWidth:2, borderRadius:8 }] },
+    options:{ ...baseOpts, indexAxis:'y', scales:{ ...baseOpts.scales, x:{ ...baseOpts.scales.x, min:0, max:100 } } }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// GOALS
+// ═══════════════════════════════════════════════════════════════
+function addGoal() {
+  const text = document.getElementById('goalInput').value.trim();
+  const cat  = document.getElementById('goalCategory').value;
+  if (!text) { showToast('Please enter a goal description', 'error'); return; }
+  state.goals.push({ id: Date.now(), text, category: cat, done: false });
+  scheduleSave(); document.getElementById('goalInput').value = '';
+  showToast('Goal added!'); renderGoals();
+}
+
+function toggleGoal(id) { const g = state.goals.find(g => g.id===id); if (g) { g.done = !g.done; scheduleSave(); } renderGoals(); }
+function deleteGoal(id) { state.goals = state.goals.filter(g => g.id!==id); scheduleSave(); showToast('Goal removed'); renderGoals(); }
+
+function renderGoals() {
+  const el = document.getElementById('goalsList');
+  if (!state.goals.length) { el.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🎯</div><div class="empty-state-text">No goals set yet</div><div class="empty-state-sub">Add your weekly targets above</div></div>`; }
+  else { el.innerHTML = state.goals.map(g => `
+    <div class="goal-item ${g.done?'done':''}">
+      <div class="goal-check ${g.done?'checked':''}" onclick="toggleGoal(${g.id})"></div>
+      <div style="flex:1"><div class="goal-text ${g.done?'done':''}">${g.text}</div><div style="font-size:11px;color:var(--text-muted);margin-top:3px">${g.category}</div></div>
+      <span class="goal-del" onclick="deleteGoal(${g.id})">×</span>
+    </div>`).join(''); }
+  const done = state.goals.filter(g=>g.done).length; const total = state.goals.length; const pct = total ? Math.round((done/total)*100) : 0;
+  document.getElementById('goalRingWrap').innerHTML = buildRing(pct, 'Done', '#06D6A0', 120);
+  document.getElementById('goalCountText').textContent = `${done} of ${total} goals completed`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MOTIVATION
+// ═══════════════════════════════════════════════════════════════
+function changeQuote() { state.quoteIndex = (state.quoteIndex + 1) % QUOTES.length; renderMotivation(); }
+
+function renderMotivation() {
+  const q = QUOTES[state.quoteIndex];
+  document.getElementById('quoteText').textContent   = q.text;
+  document.getElementById('quoteAuthor').textContent = '— ' + q.author;
+  document.getElementById('dailyMsg').textContent    = DAILY_MESSAGES[new Date().getDay() % DAILY_MESSAGES.length];
+  const totalHours = state.daily.reduce((s,d) => s+(parseFloat(d.hours)||0), 0);
+  const totalMCQs  = state.daily.reduce((s,d) => s+(parseInt(d.mcqs)||0), 0);
+  const { best: bestStreak } = calcStreak();
+  const overallPct = calcOverallProgress();
+  const milestones = [
+    { icon:'⏱️', label:'50 Study Hours',  val:`${totalHours.toFixed(0)} / 50 hrs`,  reached: totalHours >= 50  },
+    { icon:'⏱️', label:'100 Study Hours', val:`${totalHours.toFixed(0)} / 100 hrs`, reached: totalHours >= 100 },
+    { icon:'❓', label:'500 MCQs',         val:`${totalMCQs} / 500`,                 reached: totalMCQs >= 500  },
+    { icon:'❓', label:'1000 MCQs',        val:`${totalMCQs} / 1000`,                reached: totalMCQs >= 1000 },
+    { icon:'🔥', label:'7-Day Streak',     val:`${bestStreak} / 7 days`,             reached: bestStreak >= 7   },
+    { icon:'📚', label:'25% Syllabus',     val:`${overallPct}% / 25%`,               reached: overallPct >= 25  },
+    { icon:'📚', label:'50% Syllabus',     val:`${overallPct}% / 50%`,               reached: overallPct >= 50  },
+    { icon:'🏆', label:'75% Syllabus',     val:`${overallPct}% / 75%`,               reached: overallPct >= 75  },
+    { icon:'🎯', label:'5 Mock Tests',     val:`${state.mockTests.length} / 5`,      reached: state.mockTests.length >= 5 },
+  ];
+  document.getElementById('milestonesGrid').innerHTML = milestones.map(m => `
+    <div class="milestone-card ${m.reached?'reached':''}">
+      <span class="milestone-icon">${m.icon}</span>
+      <div class="milestone-label">${m.reached?'✅ ':''}${m.label}</div>
+      <div class="milestone-val">${m.val}</div>
+    </div>`).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// UTILITIES
+// ═══════════════════════════════════════════════════════════════
+function todayStr()      { return new Date().toISOString().slice(0, 10); }
+function formatDate(ds)  { if (!ds) return '—'; const d = new Date(ds + 'T00:00:00'); return d.toLocaleDateString('en-US', { day:'numeric', month:'short', year:'numeric' }); }
+</script>
+
+<!-- Module bridge: wire up Google sign-in popup -->
+<script type="module">
+  import { signInWithPopup, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+  document.addEventListener('mdcat_google_signin', async () => {
+    try {
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
+      await signInWithPopup(window._firebaseAuth, provider);
+    } catch(e) {
+      if (e.code !== 'auth/popup-closed-by-user') {
+        const t = document.getElementById('toast');
+        t.innerHTML = '❌ Sign-in failed. Please try again.';
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 3000);
+      }
+    }
+  });
+</script>
+
+</body>
+</html>
